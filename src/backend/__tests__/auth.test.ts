@@ -116,9 +116,9 @@ test("Customer Auth & Security Test Suite", async (t) => {
 
   await t.test("StorefrontAuthService.linkHistoricalGuestOrders handles empty/null inputs safely", async () => {
     const res1 = await StorefrontAuthService.linkHistoricalGuestOrders("", "+8801700000000", "test@example.com");
-    assert.strictEqual(res1, 0);
+    assert.strictEqual(res1.linkedOrdersCount, 0);
 
     const res2 = await StorefrontAuthService.linkHistoricalGuestOrders("cust-123", null, null);
-    assert.strictEqual(res2, 0);
+    assert.strictEqual(res2.linkedOrdersCount, 0);
   });
 });

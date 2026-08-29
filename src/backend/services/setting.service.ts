@@ -177,7 +177,13 @@ export class SettingService {
 
     allowedKeys.forEach((key) => {
       if (typeof payload[key] !== "undefined") {
-        sanitizedData[key] = key === "enableAnalytics" ? Boolean(payload[key]) : payload[key];
+        if (key === "enableAnalytics") {
+          sanitizedData[key] = Boolean(payload[key]);
+        } else {
+          // Normalize empty strings to null
+          const val = payload[key];
+          sanitizedData[key] = (val === "" || val === null) ? null : val;
+        }
       }
     });
 

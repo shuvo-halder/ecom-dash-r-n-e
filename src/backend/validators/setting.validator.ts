@@ -51,19 +51,19 @@ export const updateSMTPSettingsSchema = z.object({
 });
 
 export const updateAnalyticsSettingsSchema = z.object({
-  googleAnalyticsId: z.string().optional(),
-  ga4MeasurementId: z.string().optional(),
-  googleTagManagerId: z.string().optional(),
-  gtmContainerId: z.string().optional(),
-  facebookPixelId: z.string().optional(),
-  metaPixelId: z.string().optional(),
-  tiktokPixelId: z.string().optional(),
-  googleAdsId: z.string().optional(),
-  googleAdsConversionId: z.string().optional(),
-  googleAdsConversionLabel: z.string().optional(),
-  ga4ApiSecret: z.string().optional(),
-  hotjarId: z.string().optional(),
-  enableAnalytics: z.boolean().optional(),
+  googleAnalyticsId: z.string().nullable().optional(),
+  ga4MeasurementId: z.string().nullable().optional(),
+  googleTagManagerId: z.string().nullable().optional(),
+  gtmContainerId: z.string().nullable().optional(),
+  facebookPixelId: z.string().nullable().optional(),
+  metaPixelId: z.string().nullable().optional(),
+  tiktokPixelId: z.string().nullable().optional(),
+  googleAdsId: z.string().nullable().optional(),
+  googleAdsConversionId: z.string().nullable().optional(),
+  googleAdsConversionLabel: z.string().nullable().optional(),
+  ga4ApiSecret: z.string().nullable().optional(),
+  hotjarId: z.string().nullable().optional(),
+  enableAnalytics: z.boolean().nullable().optional(),
 });
 
 export const updateSecuritySettingsSchema = z.object({

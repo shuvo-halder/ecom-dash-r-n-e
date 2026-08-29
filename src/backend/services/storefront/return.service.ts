@@ -137,7 +137,6 @@ export class StorefrontReturnService {
 
     const where: any = {
       customerId,
-      order: { deletedAt: null },
     };
 
     if (options.status && options.status !== "ALL") {
@@ -212,7 +211,7 @@ export class StorefrontReturnService {
 
   static async getOrderReturns(customerId: string, orderId: string) {
     const order = await prisma.order.findFirst({
-      where: { id: orderId, customerId, deletedAt: null },
+      where: { id: orderId, customerId },
       select: { id: true, orderNumber: true },
     });
 

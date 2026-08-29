@@ -149,7 +149,7 @@ test("Customer Payments, Refunds, Returns API & IDOR Protection Tests", async (t
     },
 
     getOrderPayments: (customerId: string, orderId: string) => {
-      const order = orders.find((o) => o.id === orderId && o.customerId === customerId && o.deletedAt === null);
+      const order = orders.find((o) => o.id === orderId && o.customerId === customerId);
       if (!order) {
         throw new AppError("Order not found", 404, "ORDER_NOT_FOUND");
       }
@@ -158,7 +158,7 @@ test("Customer Payments, Refunds, Returns API & IDOR Protection Tests", async (t
 
       const paidSum = orderPayments.reduce((acc, p) => acc + p.amount, 0);
       const refundSum = orderRefunds.reduce((acc, r) => acc + r.amount, 0);
-      const dueAmount = Math.max(0, order.totalAmount - paidSum + refundSum);
+      const dueAmount = Math.max(0, order.totalAmount - paidSum);
 
       return {
         order: {
@@ -210,7 +210,7 @@ test("Customer Payments, Refunds, Returns API & IDOR Protection Tests", async (t
     },
 
     getOrderRefunds: (customerId: string, orderId: string) => {
-      const order = orders.find((o) => o.id === orderId && o.customerId === customerId && o.deletedAt === null);
+      const order = orders.find((o) => o.id === orderId && o.customerId === customerId);
       if (!order) {
         throw new AppError("Order not found", 404, "ORDER_NOT_FOUND");
       }
@@ -258,7 +258,7 @@ test("Customer Payments, Refunds, Returns API & IDOR Protection Tests", async (t
     },
 
     getOrderReturns: (customerId: string, orderId: string) => {
-      const order = orders.find((o) => o.id === orderId && o.customerId === customerId && o.deletedAt === null);
+      const order = orders.find((o) => o.id === orderId && o.customerId === customerId);
       if (!order) {
         throw new AppError("Order not found", 404, "ORDER_NOT_FOUND");
       }

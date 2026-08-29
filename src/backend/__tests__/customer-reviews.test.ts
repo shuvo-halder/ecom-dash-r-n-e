@@ -137,7 +137,7 @@ test("Customer Reviews, Review-Eligibility & IDOR Protection Tests", async (t) =
     getEligibleReviews(customerId: string) {
       const eligibleItems = orderItems.filter((item) => {
         const order = orders.find((o) => o.id === item.orderId);
-        if (!order || order.customerId !== customerId || order.deletedAt) return false;
+        if (!order || order.customerId !== customerId) return false;
         const isDelivered = ["Delivered", "DELIVERED", "Completed", "COMPLETED"].includes(order.status);
         return isDelivered && !item.review;
       });

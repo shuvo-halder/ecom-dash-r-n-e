@@ -148,7 +148,6 @@ export class StorefrontPaymentService {
 
     const where: any = {
       customerId,
-      order: { deletedAt: null },
     };
 
     if (options.status && options.status !== "ALL") {
@@ -208,7 +207,7 @@ export class StorefrontPaymentService {
 
   static async getOrderPayments(customerId: string, orderId: string) {
     const order = await prisma.order.findFirst({
-      where: { id: orderId, customerId, deletedAt: null },
+      where: { id: orderId, customerId },
       include: {
         payments: {
           where: { status: PaymentStatus.PAID },
@@ -228,7 +227,7 @@ export class StorefrontPaymentService {
     const totalAmount = Number(order.totalAmount || 0);
     const paidSum = order.payments.reduce((acc, p) => acc + Number(p.amount || 0), 0);
     const refundSum = order.refunds.reduce((acc, r) => acc + Number(r.amount || 0), 0);
-    const dueAmount = Math.max(0, totalAmount - paidSum + refundSum);
+    const dueAmount = Math.max(0, totalAmount - paidSum);
 
     const payments = await prisma.payment.findMany({
       where: { orderId, customerId },

@@ -1,8 +1,28 @@
 import { prisma } from "../../config/db";
 import { AppError } from "../../utils/AppError";
 import { mapOrderToStorefrontDTO, mapShipmentToStorefrontDTO } from "../../dtos/storefront/mappers";
+import { StorefrontAuthService } from "./auth.service";
 
 export class StorefrontOrderService {
+  static async claimGuestOrders(customerId: string, ipAddress?: string, dbClient: any = prisma) {
+    const customer = await dbClient.customer.findUnique({
+      where: { id: customerId },
+      select: { phone: true, email: true },
+    });
+
+    if (!customer) {
+      throw new AppError("Customer not found", 404, "NOT_FOUND");
+    }
+
+    return await StorefrontAuthService.linkGuestOrdersToCustomer(
+      customerId,
+      customer.phone,
+      customer.email,
+      ipAddress,
+      dbClient
+    );
+  }
+
   static async getCustomerOrders(
     customerId: string,
     options: {
@@ -18,7 +38,6 @@ export class StorefrontOrderService {
 
     const where: any = {
       customerId,
-      deletedAt: null,
     };
 
     if (options.status && options.status !== "ALL") {
@@ -80,7 +99,7 @@ export class StorefrontOrderService {
       const refundSum = order.refunds?.reduce((acc: number, r: any) => acc + Number(r.amount || 0), 0) || 0;
       const totalAmount = Number(order.totalAmount || 0);
       const paidAmount = paidSum;
-      const dueAmount = Math.max(0, totalAmount - paidSum + refundSum);
+      const dueAmount = Math.max(0, totalAmount - paidSum);
       const itemCount = order.items?.reduce((acc: number, item: any) => acc + (item.quantity || 1), 0) || 0;
 
       // Primary product image
@@ -125,7 +144,6 @@ export class StorefrontOrderService {
       where: {
         id: orderId,
         customerId,
-        deletedAt: null,
       },
       include: {
         items: {
@@ -237,7 +255,7 @@ export class StorefrontOrderService {
 
     const totalAmount = Number(order.totalAmount || 0);
     const paidAmount = paidSum;
-    const dueAmount = Math.max(0, totalAmount - paidSum + refundSum);
+    const dueAmount = Math.max(0, totalAmount - paidSum);
 
     // Shipment and Tracking Summary
     const shipmentSummary = order.shipments.map((s: any) => ({
@@ -333,7 +351,6 @@ export class StorefrontOrderService {
       where: {
         id: orderId,
         customerId,
-        deletedAt: null,
       },
       select: { id: true, orderNumber: true, status: true },
     });

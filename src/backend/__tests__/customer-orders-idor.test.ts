@@ -67,7 +67,7 @@ test("Customer Orders API & IDOR Protection Tests", async (t) => {
 
     return {
       getCustomerOrders: (customerId: string, options: { page?: number; limit?: number; status?: string; search?: string }) => {
-        let filtered = orders.filter((o) => o.customerId === customerId && o.deletedAt === null);
+        let filtered = orders.filter((o) => o.customerId === customerId);
 
         if (options.status && options.status !== "ALL") {
           filtered = filtered.filter((o) => o.status === options.status);
@@ -107,7 +107,7 @@ test("Customer Orders API & IDOR Protection Tests", async (t) => {
       },
 
       getCustomerOrderById: (customerId: string, orderId: string) => {
-        const order = orders.find((o) => o.id === orderId && o.customerId === customerId && o.deletedAt === null);
+        const order = orders.find((o) => o.id === orderId && o.customerId === customerId);
         if (!order) {
           throw new AppError("Order not found", 404, "ORDER_NOT_FOUND");
         }
@@ -115,7 +115,7 @@ test("Customer Orders API & IDOR Protection Tests", async (t) => {
       },
 
       getOrderShipments: (customerId: string, orderId: string) => {
-        const order = orders.find((o) => o.id === orderId && o.customerId === customerId && o.deletedAt === null);
+        const order = orders.find((o) => o.id === orderId && o.customerId === customerId);
         if (!order) {
           throw new AppError("Order not found", 404, "ORDER_NOT_FOUND");
         }

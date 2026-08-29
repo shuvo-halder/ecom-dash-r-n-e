@@ -103,7 +103,7 @@ export const verifyMobileRegistration = async (req: Request, res: Response, next
     await StorefrontAuthService.createCustomerRefreshToken(customer.id, refreshToken, expiresAt, ip, userAgent);
 
     // Safely associate eligible historical guest orders belonging to this verified phone number
-    const linkedOrdersCount = await StorefrontAuthService.linkGuestOrdersToCustomer(
+    const claimResult = await StorefrontAuthService.linkGuestOrdersToCustomer(
       customer.id,
       customer.phone,
       customer.email,
@@ -121,7 +121,8 @@ export const verifyMobileRegistration = async (req: Request, res: Response, next
           phone: customer.phone,
           phoneVerified: customer.phoneVerified,
         },
-        linkedOrdersCount,
+        linkedOrdersCount: claimResult.linkedOrdersCount,
+        linkedOrderIds: claimResult.linkedOrderIds,
         accessToken,
         refreshToken,
       },
@@ -205,7 +206,7 @@ export const verifyMobileLogin = async (req: Request, res: Response, next: NextF
     await StorefrontAuthService.createCustomerRefreshToken(customer.id, refreshToken, expiresAt, ip, userAgent);
 
     // Safely associate eligible historical guest orders belonging to this verified phone number
-    const linkedOrdersCount = await StorefrontAuthService.linkGuestOrdersToCustomer(
+    const claimResult = await StorefrontAuthService.linkGuestOrdersToCustomer(
       customer.id,
       customer.phone,
       customer.email,
@@ -223,7 +224,8 @@ export const verifyMobileLogin = async (req: Request, res: Response, next: NextF
           lastName: customer.lastName,
           phoneVerified: customer.phoneVerified,
         },
-        linkedOrdersCount,
+        linkedOrdersCount: claimResult.linkedOrdersCount,
+        linkedOrderIds: claimResult.linkedOrderIds,
         accessToken,
         refreshToken,
       },

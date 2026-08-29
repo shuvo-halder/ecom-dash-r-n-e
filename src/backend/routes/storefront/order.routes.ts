@@ -5,6 +5,7 @@ import {
   getMyOrderTimeline,
   getMyOrderShipments,
   getMyOrderTracking,
+  claimGuestOrders,
 } from "../../controllers/storefront/order.controller";
 import { getOrderPayments } from "../../controllers/storefront/payment.controller";
 import { getOrderRefunds } from "../../controllers/storefront/refund.controller";
@@ -16,6 +17,7 @@ const router = express.Router();
 
 router.use(requireCustomerAuth);
 
+router.post("/claim-guest-orders", claimGuestOrders);
 router.get("/", getMyOrders);
 router.get("/:id", validateParamsUUID(["id"]), getMyOrderById);
 router.get("/:id/timeline", validateParamsUUID(["id"]), getMyOrderTimeline);

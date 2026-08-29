@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
-    "test": "tsx src/backend/__tests__/rbac.test.ts"
+    "test": "tsx --test src/backend/__tests__/*.test.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

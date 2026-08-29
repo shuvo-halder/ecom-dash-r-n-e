@@ -460,19 +460,26 @@ export function Settings() {
                         <Input name="tiktokPixelId" value={formData.tiktokPixelId || ""} onChange={handleChange} placeholder="CXXXXXXXXXXXXXXXXX" />
                       </div>
                       <div>
-                        <label className="text-sm font-medium mb-1 block">Google Ads Conversion ID</label>
+                        <label className="text-sm font-medium mb-1 block">Google Ads ID</label>
                         <Input name="googleAdsId" value={formData.googleAdsId || ""} onChange={handleChange} placeholder="AW-XXXXXXXXX" />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium mb-1 block">Google Ads Conversion ID</label>
+                        <Input name="googleAdsConversionId" value={formData.googleAdsConversionId || ""} onChange={handleChange} placeholder="AW-XXXXXXXXX" />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium mb-1 block">Google Ads Conversion Label</label>
+                        <Input name="googleAdsConversionLabel" value={formData.googleAdsConversionLabel || ""} onChange={handleChange} placeholder="XXXXXXXXXXXXXXXXXXX" />
                       </div>
                       <div>
                         <label className="text-sm font-medium mb-1 block">GA4 API Secret (Measurement Protocol)</label>
                         <Input name="ga4ApiSecret" value={formData.ga4ApiSecret || ""} onChange={handleChange} placeholder="Secret key for server-side events" />
                       </div>
                       <div>
-                        <label className="text-sm font-medium mb-1 block">Hotjar Site ID</label>
-                        <Input name="hotjarId" value={formData.hotjarId || ""} onChange={handleChange} placeholder="987654" />
+                        <label className="text-sm font-medium mb-1 block">Hotjar ID</label>
+                        <Input name="hotjarId" value={formData.hotjarId || ""} onChange={handleChange} placeholder="1234567" />
                       </div>
                     </div>
-
                     <div className="pt-2">
                       <label className="flex items-center gap-2 cursor-pointer text-sm font-medium">
                         <input

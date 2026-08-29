@@ -152,10 +152,11 @@ export class AdminReviewService {
       throw new AppError("Review not found", 404, "NOT_FOUND");
     }
 
-    // 2. Delete DB Record
+    // 2. Archive DB Record
     try {
-      await prisma.review.delete({
-        where: { id }
+      await prisma.review.update({
+        where: { id },
+        data: { deletedAt: new Date() }
       });
     } catch (e: any) {
       if (e.code === 'P2025') {
@@ -165,19 +166,8 @@ export class AdminReviewService {
       throw e;
     }
 
-    // 3. Attempt Cloudinary cleanup safely outside transaction
-    if (isCloudinaryConfigured()) {
-      for (const image of review.images) {
-        if (image.cloudinaryPublicId) {
-          try {
-            await cloudinary.uploader.destroy(image.cloudinaryPublicId);
-          } catch (error: any) {
-            console.error(`[Cloudinary Cleanup Failed] Review: ${id}, PublicID: ${image.cloudinaryPublicId}, Error: ${error.message}`);
-          }
-        }
-      }
-    }
-
+    // Images are not destroyed from Cloudinary because the review is only soft-deleted
+    // and remains visible in the customer's personal history.
     return { success: true };
   }
 }

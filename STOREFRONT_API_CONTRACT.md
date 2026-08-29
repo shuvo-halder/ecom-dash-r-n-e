@@ -140,11 +140,18 @@ Verify SMS OTP and complete mobile registration.
       "phone": "+8801711111111",
       "phoneVerified": true
     },
+    "linkedOrdersCount": 3,
+    "linkedOrderIds": [
+      "ord-1a2b3c4d",
+      "ord-5e6f7g8h",
+      "ord-9i0j1k2l"
+    ],
     "accessToken": "eyJhbGciOi...",
     "refreshToken": "eyJhbGciOi..."
   }
 }
 ```
+*Note: `linkedOrdersCount` and `linkedOrderIds` represent historical guest orders successfully linked to the authenticated customer account.*
 
 ---
 
@@ -188,11 +195,18 @@ Complete mobile phone login with SMS OTP.
       "id": "c1a2b3c4-d5e6-7f8a-9b0c-1d2e3f4a5b6c",
       "phone": "+8801711111111"
     },
+    "linkedOrdersCount": 3,
+    "linkedOrderIds": [
+      "ord-1a2b3c4d",
+      "ord-5e6f7g8h",
+      "ord-9i0j1k2l"
+    ],
     "accessToken": "eyJhbGciOi...",
     "refreshToken": "eyJhbGciOi..."
   }
 }
 ```
+*Note: `linkedOrdersCount` and `linkedOrderIds` represent historical guest orders successfully linked to the authenticated customer account.*
 
 ---
 
@@ -343,7 +357,50 @@ Update safe customer profile details.
 
 ---
 
-#### 12. `GET /customer/orders`
+#### 12. `POST /customer/orders/claim-guest-orders`
+On-demand endpoint to synchronize and claim historical guest orders placed using the customer's verified phone number or email.
+- **Auth Required**: Yes (`Bearer <token>`)
+- **Security**: Derives customer ID exclusively from the token. Ignores any request body parameters.
+- **Idempotency**: Safe to call multiple times. Returns `0` if all matching orders are already claimed.
+- **Cascade**: Automatically links associated Payments, Refunds, Return Requests, and Reviews.
+
+**Request**
+```json
+{}
+```
+
+**Response (Success - Orders found)**
+```json
+{
+  "success": true,
+  "message": "Guest orders synchronized successfully.",
+  "data": {
+    "linkedOrdersCount": 3,
+    "linkedOrderIds": [
+      "ord-1a2b3c4d",
+      "ord-5e6f7g8h",
+      "ord-9i0j1k2l"
+    ]
+  }
+}
+```
+
+**Response (Success - No new orders found)**
+```json
+{
+  "success": true,
+  "message": "No new guest orders were found.",
+  "data": {
+    "linkedOrdersCount": 0,
+    "linkedOrderIds": []
+  }
+}
+```
+
+> **Client Integration Note (Next.js Storefront):**
+> When users navigate to **Customer Portal → Account Settings → Sync Historical Orders**, the frontend should call this endpoint without any payload. After a successful synchronization (where `linkedOrdersCount > 0`), the frontend must refresh the Customer Dashboard, Orders, Payments, Refunds, Returns, Shipments, Tracking, and Review eligibility contexts to reflect the newly claimed history.
+
+#### 13. `GET /customer/orders`
 List orders belonging strictly to the authenticated customer.
 
 - **Auth Required**: Yes (`Bearer <token>`)
@@ -381,7 +438,7 @@ List orders belonging strictly to the authenticated customer.
 
 ---
 
-#### 13. `GET /customer/orders/:orderId`
+#### 14. `GET /customer/orders/:orderId`
 Get full details of a specific customer order.
 
 - **Auth Required**: Yes (`Bearer <token>`)
@@ -395,7 +452,7 @@ Get full details of a specific customer order.
 
 ---
 
-#### 14. `GET /customer/payments`
+#### 15. `GET /customer/payments`
 List all payments made across all orders of the authenticated customer.
 
 - **Auth Required**: Yes (`Bearer <token>`)
@@ -404,7 +461,7 @@ List all payments made across all orders of the authenticated customer.
 
 ---
 
-#### 15. `GET /customer/orders/:orderId/payments`
+#### 16. `GET /customer/orders/:orderId/payments`
 Get payment transactions and financial summary for a specific order.
 
 - **Auth Required**: Yes (`Bearer <token>`)
@@ -441,7 +498,7 @@ Get payment transactions and financial summary for a specific order.
 
 ---
 
-#### 16. `GET /customer/shipments`
+#### 17. `GET /customer/shipments`
 List all shipments associated with authenticated customer's orders.
 
 - **Auth Required**: Yes (`Bearer <token>`)
@@ -450,7 +507,7 @@ List all shipments associated with authenticated customer's orders.
 
 ---
 
-#### 17. `GET /customer/orders/:orderId/shipments`
+#### 18. `GET /customer/orders/:orderId/shipments`
 Get shipment packages and item dispatch statuses for a specific order.
 
 - **Auth Required**: Yes (`Bearer <token>`)
@@ -458,7 +515,7 @@ Get shipment packages and item dispatch statuses for a specific order.
 
 ---
 
-#### 18. `GET /customer/orders/:orderId/tracking`
+#### 19. `GET /customer/orders/:orderId/tracking`
 Consolidated tracking timeline, courier link, and delivery status milestones for an order.
 
 - **Auth Required**: Yes (`Bearer <token>`)
@@ -493,22 +550,22 @@ Consolidated tracking timeline, courier link, and delivery status milestones for
 
 ---
 
-#### 19. `GET /customer/refunds`
+#### 20. `GET /customer/refunds`
 List all refund requests/records for the customer.
 
 - **Auth Required**: Yes (`Bearer <token>`)
 
-#### 20. `GET /customer/orders/:orderId/refunds`
+#### 21. `GET /customer/orders/:orderId/refunds`
 Get refund records and adjustment history for a specific order (with IDOR protection).
 
 - **Auth Required**: Yes (`Bearer <token>`)
 
-#### 21. `GET /customer/returns`
+#### 22. `GET /customer/returns`
 List return requests initiated by the authenticated customer.
 
 - **Auth Required**: Yes (`Bearer <token>`)
 
-#### 22. `GET /customer/orders/:orderId/returns`
+#### 23. `GET /customer/orders/:orderId/returns`
 Get return requests for a specific order (with IDOR protection).
 
 - **Auth Required**: Yes (`Bearer <token>`)
@@ -519,7 +576,7 @@ Get return requests for a specific order (with IDOR protection).
 
 ---
 
-#### 23. `GET /customer/reviews`
+#### 24. `GET /customer/reviews`
 List all product reviews submitted by the authenticated customer.
 
 - **Auth Required**: Yes (`Bearer <token>`)
@@ -551,7 +608,7 @@ List all product reviews submitted by the authenticated customer.
 
 ---
 
-#### 24. `GET /customer/reviews/eligible`
+#### 25. `GET /customer/reviews/eligible`
 Get all unreviewed `OrderItem` purchases eligible for review.
 
 - **Auth Required**: Yes (`Bearer <token>`)
@@ -578,7 +635,7 @@ Get all unreviewed `OrderItem` purchases eligible for review.
 
 ---
 
-#### 25. `POST /customer/reviews`
+#### 26. `POST /customer/reviews`
 Submit a verified purchase review.
 
 - **Auth Required**: Yes (`Bearer <token>`)
@@ -606,7 +663,7 @@ Submit a verified purchase review.
 
 ---
 
-#### 26. `GET /customer/notifications`
+#### 27. `GET /customer/notifications`
 List in-app notifications for authenticated customer with unread count.
 
 - **Auth Required**: Yes (`Bearer <token>`)
@@ -639,7 +696,7 @@ List in-app notifications for authenticated customer with unread count.
 
 ---
 
-#### 27. `PATCH /customer/notifications/:id/read`
+#### 28. `PATCH /customer/notifications/:id/read`
 Mark a single notification as read.
 
 - **Auth Required**: Yes (`Bearer <token>`)
@@ -654,7 +711,7 @@ Mark a single notification as read.
 
 ---
 
-#### 28. `PATCH /customer/notifications/read-all`
+#### 29. `PATCH /customer/notifications/read-all`
 Mark all unread in-app notifications for the customer as read.
 
 - **Auth Required**: Yes (`Bearer <token>`)
@@ -798,3 +855,58 @@ export const storefrontClient = new StorefrontApiClient();
 }
 ```
 - Match error codes in the UI to display localized, user-friendly toast messages.
+
+---
+
+## 25. Analytics Configuration API
+
+### 📊 Analytics Endpoints
+
+#### 1. `GET /analytics/config`
+Retrieves the safe, public analytics tracking configuration intended for the frontend Next.js Storefront. This endpoint strips out any server-side secrets (like `ga4ApiSecret`).
+
+- **Auth Required**: No (Public)
+- **Response Caching**: Yes (30 seconds TTL via `StorefrontSettingService`)
+- **Success Response (`200 OK`)**:
+```json
+{
+  "status": "success",
+  "data": {
+    "ga4MeasurementId": "G-XXXXXXXXXX",
+    "googleAnalyticsId": "G-XXXXXXXXXX",
+    "gtmContainerId": "GTM-XXXXXXX",
+    "googleTagManagerId": "GTM-XXXXXXX",
+    "metaPixelId": "1234567890",
+    "facebookPixelId": "1234567890",
+    "googleAdsId": "AW-XXXXXXXXX",
+    "googleAdsConversionId": "AW-XXXXXXXXX",
+    "googleAdsConversionLabel": "AbCdEfG",
+    "tiktokPixelId": null,
+    "hotjarId": null,
+    "enableAnalytics": true
+  }
+}
+```
+
+### Next.js Storefront Integration Requirements
+- **Initialization**: The Storefront should check the `enableAnalytics` flag. If `false`, do not inject any tags or fire any analytics events.
+- **Provider Skipping**: If an ID (e.g. `tiktokPixelId`) is `null`, the Storefront must bypass initializing that specific provider's tracking script. Analytics failures or unconfigured providers must **never** block the core Storefront commerce functionality (Cart, Checkout).
+- **Security**: The backend explicitly prevents sending the `ga4ApiSecret`. Do not attempt to read or proxy this value on the frontend. The backend will autonomously push server-side `purchase` events to GA4's Measurement Protocol using the secret.
+
+---
+
+## 26. Order Archival & Historical Data Ownership
+
+### 🗄️ Archival Independence
+- **Admin Workspace vs Customer History**: The system strictly separates Admin workspace visibility from Customer data ownership. When an admin archives an order (setting `deletedAt`), it is hidden from the Admin's active workspace, but **it is never hidden from the authenticated customer's Storefront history.**
+- **Historical Immutability**: Archiving an order by an admin does **not** destroy or hide the customer's historical records. Archived orders will continue to appear in `GET /customer/orders`.
+- **Financial & Logistics Transparency**: Archived orders fully retain visibility of their associated `payments`, `refunds`, `returns`, `shipments`, and `tracking` via the customer portal.
+- **Review Eligibility**: Archived orders that are `DELIVERED` or `COMPLETED` retain their review eligibility, provided they have not already been reviewed. Admin moderation of a review (soft-deletion) does not destroy the Cloudinary image assets or the underlying review record for the customer, maintaining the customer's personal history.
+
+### 🧾 Financial Semantics (dueAmount)
+- The outstanding customer balance (`dueAmount`) on any order is strictly defined as `Math.max(0, totalAmount - paidSum)`.
+- **Refunds do not reopen debt**: When a customer is refunded (e.g. for a return or discount), the business is returning settled funds. The `dueAmount` calculation does **not** add `refundSum` back into the amount owed, as standard B2C eCommerce financial models consider refunded amounts as resolved balance, not newly owed debt.
+
+### 🛡️ Guest Claiming & Concurrency Protection
+- **Archived Guest Orders**: If a guest places an order and an admin archives it before the guest creates a verified account, the order **can still be claimed** by the customer when they successfully verify the matching phone number or email.
+- **Ownership Inviolability**: An order is strictly protected once claimed. A guest order with a non-null `customerId` can **never** be reassigned to another customer, preventing IDOR and cross-account data leaks.

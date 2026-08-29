@@ -14,7 +14,6 @@ export class StorefrontShipmentService {
     const where: any = {
       order: {
         customerId,
-        deletedAt: null,
       },
     };
 
@@ -68,7 +67,7 @@ export class StorefrontShipmentService {
 
   static async getOrderShipments(customerId: string, orderId: string) {
     const order = await prisma.order.findFirst({
-      where: { id: orderId, customerId, deletedAt: null },
+      where: { id: orderId, customerId },
       select: { id: true, orderNumber: true, status: true },
     });
 
@@ -114,7 +113,7 @@ export class StorefrontShipmentService {
 
   static async getOrderTracking(customerId: string, orderId: string) {
     const order = await prisma.order.findFirst({
-      where: { id: orderId, customerId, deletedAt: null },
+      where: { id: orderId, customerId },
       include: {
         shipments: {
           include: {

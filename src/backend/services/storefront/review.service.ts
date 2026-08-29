@@ -364,7 +364,6 @@ export class StorefrontReviewService {
         order: {
           customerId,
           status: { in: ["Delivered", "DELIVERED", "Completed", "COMPLETED"] },
-          deletedAt: null,
         },
         review: null,
       },
@@ -486,7 +485,6 @@ export class StorefrontReviewService {
             productId,
             order: {
               customerId,
-              deletedAt: null,
             },
           },
           include: {

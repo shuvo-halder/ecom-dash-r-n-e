@@ -94,7 +94,7 @@ test("Customer Shipments & Tracking API & IDOR Protection Tests", async (t) => {
 
   const service = {
     getCustomerShipments: (customerId: string, options: { page?: number; limit?: number; status?: string } = {}) => {
-      const userOrders = orders.filter((o) => o.customerId === customerId && o.deletedAt === null).map((o) => o.id);
+      const userOrders = orders.filter((o) => o.customerId === customerId).map((o) => o.id);
       let userShipments = shipments.filter((s) => userOrders.includes(s.orderId));
 
       if (options.status && options.status !== "ALL") {
@@ -130,7 +130,7 @@ test("Customer Shipments & Tracking API & IDOR Protection Tests", async (t) => {
     },
 
     getOrderShipments: (customerId: string, orderId: string) => {
-      const order = orders.find((o) => o.id === orderId && o.customerId === customerId && o.deletedAt === null);
+      const order = orders.find((o) => o.id === orderId && o.customerId === customerId);
       if (!order) {
         throw new AppError("Order not found", 404, "ORDER_NOT_FOUND");
       }
@@ -164,7 +164,7 @@ test("Customer Shipments & Tracking API & IDOR Protection Tests", async (t) => {
     },
 
     getOrderTracking: (customerId: string, orderId: string) => {
-      const order = orders.find((o) => o.id === orderId && o.customerId === customerId && o.deletedAt === null);
+      const order = orders.find((o) => o.id === orderId && o.customerId === customerId);
       if (!order) {
         throw new AppError("Order not found", 404, "ORDER_NOT_FOUND");
       }

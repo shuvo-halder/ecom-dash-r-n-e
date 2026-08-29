@@ -92,3 +92,32 @@ export const getMyOrderTracking = async (req: CustomerAuthRequest, res: Response
     next(error);
   }
 };
+
+export const claimGuestOrders = async (
+  req: CustomerAuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const customerId = req.customer!.id;
+    const ip = (req.headers["x-forwarded-for"] as string) || req.ip || req.socket.remoteAddress || "Unknown";
+    
+    const result = await StorefrontOrderService.claimGuestOrders(customerId, ip);
+    
+    if (result.linkedOrdersCount > 0) {
+      res.status(200).json({
+        success: true,
+        message: "Guest orders synchronized successfully.",
+        data: result,
+      });
+    } else {
+      res.status(200).json({
+        success: true,
+        message: "No new guest orders were found.",
+        data: result,
+      });
+    }
+  } catch (error) {
+    next(error);
+  }
+};
