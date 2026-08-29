@@ -268,8 +268,39 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
 
   // Helper to check if a pathname matches a route
   const isRouteActive = (href: string) => {
-    if (href === '/') return location.pathname === '/';
-    return location.pathname.startsWith(href);
+    if (!href) return false;
+    
+    // Normalize path to strip trailing slash
+    const path = location.pathname.endsWith('/') && location.pathname !== '/'
+      ? location.pathname.slice(0, -1) 
+      : location.pathname;
+      
+    const targetHref = href.endsWith('/') && href !== '/'
+      ? href.slice(0, -1) 
+      : href;
+      
+    if (path === targetHref) return true;
+    if (targetHref === '/') return path === '/';
+
+    // Segment-aware child matching (e.g. /orders/123 matches /orders)
+    if (path.startsWith(targetHref + '/')) return true;
+
+    // Handle common alias paths where 'admin/' is prefixed to the path
+    if (path.startsWith('/admin' + targetHref)) {
+        if (path === '/admin' + targetHref || path.startsWith('/admin' + targetHref + '/')) {
+            return true;
+        }
+    }
+    
+    // Reverse alias: if href has /admin but path doesn't
+    if (targetHref.startsWith('/admin/')) {
+        const nonAdminHref = targetHref.replace('/admin', '');
+        if (path === nonAdminHref || path.startsWith(nonAdminHref + '/')) {
+            return true;
+        }
+    }
+
+    return false;
   };
 
   // Automatically expand group containing current active route
