@@ -1,6 +1,5 @@
 import { Request, Response } from "express";
 import { storefrontProductService } from "../../services/storefront/product.service";
-import { ga4Service } from "../../services/storefront/ga4.service";
 
 // Simple async handler to avoid try/catch blocks
 const asyncHandler = (fn: any) => (req: Request, res: Response, next: any) => {
@@ -31,12 +30,8 @@ export const getProducts = asyncHandler(async (req: Request, res: Response) => {
   };
 
   const result = await storefrontProductService.getProducts(options);
-  const ga4 = ga4Service.getProductListPayload(result.data, "Product List");
 
-  res.json({
-    ...result,
-    ga4
-  });
+  res.json(result);
 });
 
 export const getProductBySlug = asyncHandler(async (req: Request, res: Response) => {
@@ -47,8 +42,7 @@ export const getProductBySlug = asyncHandler(async (req: Request, res: Response)
     return res.status(404).json({ success: false, message: "Product not found" });
   }
 
-  const ga4 = ga4Service.getProductDetailPayload(product);
-
-  res.json({ data: product, ga4 });
+  res.json({ data: product });
 });
+
 

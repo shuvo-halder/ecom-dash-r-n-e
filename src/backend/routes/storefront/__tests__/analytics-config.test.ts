@@ -84,10 +84,10 @@ test("Storefront Analytics Configuration API Contract Tests", async (t) => {
 
     const config = res.body.data;
     assert.strictEqual(config.ga4MeasurementId, "G-TEST123456");
-    assert.strictEqual(config.googleAnalyticsId, "G-TEST123456");
+    assert.strictEqual(config.googleAnalyticsId, undefined);
     assert.strictEqual(config.gtmContainerId, "GTM-TEST999");
-    assert.strictEqual(config.googleTagManagerId, "GTM-TEST999");
-    assert.strictEqual(config.metaPixelId, "FB-PIXEL-888");
+    assert.strictEqual(config.googleTagManagerId, undefined);
+    assert.strictEqual(config.metaPixelId, undefined);
     assert.strictEqual(config.facebookPixelId, "FB-PIXEL-888");
     assert.strictEqual(config.tiktokPixelId, "TT-PIXEL-777");
     assert.strictEqual(config.googleAdsId, "AW-111222333");
@@ -109,10 +109,10 @@ test("Storefront Analytics Configuration API Contract Tests", async (t) => {
 
     const analytics = res.body.data.analytics;
     assert.strictEqual(analytics.ga4MeasurementId, "G-TEST123456");
-    assert.strictEqual(analytics.googleAnalyticsId, "G-TEST123456");
+    assert.strictEqual(analytics.googleAnalyticsId, undefined);
     assert.strictEqual(analytics.gtmContainerId, "GTM-TEST999");
-    assert.strictEqual(analytics.googleTagManagerId, "GTM-TEST999");
-    assert.strictEqual(analytics.metaPixelId, "FB-PIXEL-888");
+    assert.strictEqual(analytics.googleTagManagerId, undefined);
+    assert.strictEqual(analytics.metaPixelId, undefined);
     assert.strictEqual(analytics.facebookPixelId, "FB-PIXEL-888");
     assert.strictEqual(analytics.tiktokPixelId, "TT-PIXEL-777");
     assert.strictEqual(analytics.googleAdsId, "AW-111222333");

@@ -57,12 +57,9 @@ export class StorefrontSettingService {
         customHeadCode: seo?.customHeadCode || null
       },
       analytics: analytics ? {
-        googleAnalyticsId: analytics.googleAnalyticsId,
         ga4MeasurementId: analytics.googleAnalyticsId,
-        googleTagManagerId: analytics.googleTagManagerId,        
         gtmContainerId: analytics.googleTagManagerId,
         facebookPixelId: analytics.facebookPixelId,
-        metaPixelId: analytics.facebookPixelId,
         tiktokPixelId: analytics.tiktokPixelId,
         googleAdsId: analytics.googleAdsId,
         googleAdsConversionId: analytics.googleAdsConversionId || analytics.googleAdsId || null,
@@ -70,12 +67,9 @@ export class StorefrontSettingService {
         hotjarId: analytics.hotjarId,
         enableAnalytics: Boolean(analytics.enableAnalytics)
       } : {
-        googleAnalyticsId: process.env.GA_MEASUREMENT_ID || null,
         ga4MeasurementId: process.env.GA_MEASUREMENT_ID || null,
-        googleTagManagerId: null,
         gtmContainerId: null,
         facebookPixelId: null,
-        metaPixelId: null,
         tiktokPixelId: null,
         googleAdsId: null,
         googleAdsConversionId: null,
