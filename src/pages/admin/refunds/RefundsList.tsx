@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import {
   getRefunds,
+  deleteRefund,
   approveRefund,
   rejectRefund,
   initiateRefund,
@@ -23,6 +24,7 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
+  Trash2,
   AlertCircle,
   Plus,
   RefreshCw,
@@ -89,6 +91,14 @@ export function RefundsList() {
   });
 
   // Initiate Refund Mutation
+  const deleteMutation = useMutation({
+    mutationFn: deleteRefund,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["refunds"] });
+      notify.success("Archived", "Refund archived successfully");
+    },
+  });
+
   const initiateMutation = useMutation({
     mutationFn: (payload: { orderId: string; paymentId: string; amount: number; reason: string }) =>
       initiateRefund(payload),
@@ -350,6 +360,15 @@ export function RefundsList() {
                             <Eye className="w-4 h-4 text-muted-foreground" />
                           </Link>
                         </Button>
+                        {canWrite && (
+                          <Button variant="ghost" size="icon" onClick={() => {
+                            if(window.confirm("Archive this refund?")) {
+                              deleteMutation.mutate(refund.id);
+                            }
+                          }}>
+                            <Trash2 className="w-4 h-4 text-rose-500" />
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>

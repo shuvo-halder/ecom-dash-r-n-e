@@ -1044,6 +1044,7 @@ model Payment {
   customer             Customer?            @relation(fields: [customerId], references: [id], onDelete: Cascade)
   transactions         PaymentTransaction[]
   refunds              Refund[]
+  deletedAt            DateTime?
 
   @@index([orderId])
   @@index([customerId])
@@ -1107,6 +1108,7 @@ model Refund {
   order        Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
   customer     Customer?           @relation(fields: [customerId], references: [id], onDelete: Cascade)
   transactions RefundTransaction[]
+  deletedAt    DateTime?
 
   @@index([paymentId])
   @@index([orderId])
@@ -1187,6 +1189,7 @@ model Shipment {
   courier        Courier?        @relation(fields: [courierId], references: [id])
   items          ShipmentItem[]
   trackingEvents TrackingEvent[]
+  deletedAt      DateTime?
 
   @@index([orderId])
   @@index([courierId])
@@ -1240,9 +1243,10 @@ model ReturnRequest {
   createdAt  DateTime     @default(now())
   updatedAt  DateTime     @updatedAt
 
-  order    Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  customer Customer?    @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  items    ReturnItem[]
+  order     Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  customer  Customer?    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  items     ReturnItem[]
+  deletedAt DateTime?
 
   @@index([orderId])
   @@index([customerId])

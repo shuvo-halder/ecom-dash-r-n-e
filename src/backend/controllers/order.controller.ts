@@ -537,10 +537,30 @@ export const deleteOrder = async (req: AuthRequest, res: Response, next: NextFun
       return next(new AppError("Order not found", 404, "NOT_FOUND"));
     }
 
-    await prisma.order.update({
-      where: { id },
-      data: { deletedAt: new Date() },
-    });
+    const now = new Date();
+
+    await prisma.$transaction([
+      prisma.order.update({
+        where: { id },
+        data: { deletedAt: now },
+      }),
+      prisma.payment.updateMany({
+        where: { orderId: id, deletedAt: null },
+        data: { deletedAt: now },
+      }),
+      prisma.refund.updateMany({
+        where: { orderId: id, deletedAt: null },
+        data: { deletedAt: now },
+      }),
+      prisma.returnRequest.updateMany({
+        where: { orderId: id, deletedAt: null },
+        data: { deletedAt: now },
+      }),
+      prisma.shipment.updateMany({
+        where: { orderId: id, deletedAt: null },
+        data: { deletedAt: now },
+      })
+    ]);
 
     await AuditService.createLog(
       req.user?.id || null,

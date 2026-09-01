@@ -1,19 +1,25 @@
 import React, { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { getShipments } from "../../../services/shipment.service";
+import { getShipments, deleteShipment } from "../../../services/shipment.service";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../../components/ui/table";
 import { Button } from "../../../components/ui/button";
 import { Input } from "../../../components/ui/input";
 import { Card } from "../../../components/ui/card";
 import { LoadingSpinner } from "../../../components/ui/LoadingSpinner";
-import { Search, ChevronLeft, ChevronRight, Eye } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, Eye, Trash2 } from "lucide-react";
 
 export function ShipmentsList() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   
+  const queryClient = useQueryClient();
+  const deleteMutation = useMutation({
+    mutationFn: deleteShipment,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["shipments"] }),
+  });
+
   const { data, isLoading } = useQuery({
     queryKey: ["shipments", page, search, status],
     queryFn: () => getShipments({ page, limit: 10, search, status }),
@@ -95,6 +101,13 @@ export function ShipmentsList() {
                         <Link to={`/admin/shipments/${shipment.id}`}>
                           <Eye className="w-4 h-4" />
                         </Link>
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => {
+                        if(window.confirm("Archive this shipment?")) {
+                          deleteMutation.mutate(shipment.id);
+                        }
+                      }}>
+                        <Trash2 className="w-4 h-4 text-rose-500" />
                       </Button>
                     </TableCell>
                   </TableRow>

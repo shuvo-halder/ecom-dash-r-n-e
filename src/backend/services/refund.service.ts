@@ -10,7 +10,7 @@ export class AdminRefundService {
    */
   static async getRefunds({ page = 1, limit = 10, search, status }: { page?: number; limit?: number; search?: string; status?: string }) {
     const skip = (page - 1) * limit;
-    const where: any = {};
+    const where: any = { deletedAt: null };
     if (status && Object.values(RefundStatus).includes(status as RefundStatus)) {
       where.status = status as RefundStatus;
     }
@@ -481,6 +481,19 @@ export class AdminRefundService {
     } catch (e) {}
 
     return completedRefund;
+    }
+
+  static async deleteRefund(id: string) {
+    const refund = await prisma.refund.findFirst({
+      where: { id, deletedAt: null }
+    });
+    if (!refund) {
+      throw new AppError("Refund not found", 404, "REFUND_NOT_FOUND");
+    }
+    return await prisma.refund.update({
+      where: { id },
+      data: { deletedAt: new Date() }
+    });
   }
 }
 

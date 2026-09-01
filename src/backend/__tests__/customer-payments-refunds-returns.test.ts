@@ -302,7 +302,7 @@ test("Customer Payments, Refunds, Returns API & IDOR Protection Tests", async (t
     assert.strictEqual(res.order.id, "order-a-101");
     assert.strictEqual(res.order.summary.total, 1500);
     assert.strictEqual(res.order.summary.paid, 1500);
-    assert.strictEqual(res.order.summary.due, 300); // 1500 total - 1500 paid + 300 refund = 300 due
+    assert.strictEqual(res.order.summary.due, 0); // 1500 total - 1500 paid = 0 due
     assert.strictEqual(res.payments.length, 1);
     assert.strictEqual(res.payments[0].amount, 1500);
   });

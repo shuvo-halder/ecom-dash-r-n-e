@@ -1,19 +1,25 @@
 import React, { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { getPayments } from "../../../services/payment.service";
+import { getPayments, deletePayment } from "../../../services/payment.service";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../../components/ui/table";
 import { Button } from "../../../components/ui/button";
 import { Input } from "../../../components/ui/input";
 import { Card } from "../../../components/ui/card";
 import { LoadingSpinner } from "../../../components/ui/LoadingSpinner";
-import { Search, ChevronLeft, ChevronRight, Eye } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, Eye, Trash2 } from "lucide-react";
 
 export function PaymentsList() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   
+  const queryClient = useQueryClient();
+  const deleteMutation = useMutation({
+    mutationFn: deletePayment,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["payments"] }),
+  });
+
   const { data, isLoading } = useQuery({
     queryKey: ["payments", page, search, status],
     queryFn: () => getPayments({ page, limit: 10, search, status }),
@@ -92,11 +98,20 @@ export function PaymentsList() {
                   </TableCell>
                   <TableCell>{new Date(payment.createdAt).toLocaleDateString()}</TableCell>
                   <TableCell>
-                    <Button variant="ghost" size="icon" asChild>
-                      <Link to={`/admin/payments/${payment.id}`}>
-                        <Eye className="w-4 h-4" />
-                      </Link>
-                    </Button>
+                    <div className="flex items-center justify-end gap-1">
+                      <Button variant="ghost" size="icon" asChild>
+                        <Link to={`/admin/payments/${payment.id}`}>
+                          <Eye className="w-4 h-4" />
+                        </Link>
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => {
+                        if(window.confirm("Archive this payment?")) {
+                          deleteMutation.mutate(payment.id);
+                        }
+                      }}>
+                        <Trash2 className="w-4 h-4 text-rose-500" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}

@@ -8,7 +8,7 @@ export class AdminPaymentService {
     const limit = Math.min(50, Math.max(1, options.limit || 10));
     const skip = (page - 1) * limit;
 
-    const where: any = {};
+    const where: any = { deletedAt: null };
 
     if (options.status) {
       where.status = options.status as PaymentStatus;
@@ -164,6 +164,19 @@ export class AdminPaymentService {
       }
 
       return updatedPayment;
+    });
+    }
+
+  static async deletePayment(id: string) {
+    const payment = await prisma.payment.findFirst({
+      where: { id, deletedAt: null }
+    });
+    if (!payment) {
+      throw new AppError("Payment not found", 404, "PAYMENT_NOT_FOUND");
+    }
+    return await prisma.payment.update({
+      where: { id },
+      data: { deletedAt: new Date() }
     });
   }
 }

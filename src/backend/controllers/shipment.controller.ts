@@ -54,3 +54,16 @@ export const updateShipmentStatus = async (req: any, res: Response, next: NextFu
     next(error);
   }
 };
+
+export const deleteShipment = async (req: any, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    await AdminShipmentService.deleteShipment(id);
+    res.status(200).json({
+      status: "success",
+      message: "Shipment archived successfully"
+    });
+  } catch (error) {
+    next(error);
+  }
+};

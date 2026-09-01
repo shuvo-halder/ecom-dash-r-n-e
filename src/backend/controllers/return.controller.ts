@@ -83,3 +83,16 @@ export const receiveReturn = async (req: any, res: Response, next: NextFunction)
     next(error);
   }
 };
+
+export const deleteReturn = async (req: any, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    await AdminReturnService.deleteReturn(id);
+    res.status(200).json({
+      status: "success",
+      message: "Return request archived successfully"
+    });
+  } catch (error) {
+    next(error);
+  }
+};

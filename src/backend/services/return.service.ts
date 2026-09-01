@@ -9,7 +9,7 @@ export class AdminReturnService {
     const limit = Math.min(50, Math.max(1, options.limit || 10));
     const skip = (page - 1) * limit;
 
-    const where: any = {};
+    const where: any = { deletedAt: null };
 
     if (options.status) {
       where.status = options.status as ReturnStatus;
@@ -400,5 +400,18 @@ export class AdminReturnService {
     });
 
     return updatedTransaction;
+    }
+
+  static async deleteReturn(id: string) {
+    const returnReq = await prisma.returnRequest.findFirst({
+      where: { id, deletedAt: null }
+    });
+    if (!returnReq) {
+      throw new AppError("Return request not found", 404, "RETURN_NOT_FOUND");
+    }
+    return await prisma.returnRequest.update({
+      where: { id },
+      data: { deletedAt: new Date() }
+    });
   }
 }

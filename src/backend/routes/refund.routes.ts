@@ -6,6 +6,7 @@ import {
   rejectRefund,
   processRefund,
   initiateRefund,
+  deleteRefund,
 } from "../controllers/refund.controller";
 import { requireAuth, requirePermission } from "../middlewares/auth";
 import { validateBody, validateParamsUUID } from "../middlewares/validation";
@@ -46,6 +47,8 @@ router.post(
   validateParamsUUID(["id"]),
   rejectRefund
 );
+
+router.delete("/:id", requirePermission("Orders", "write"), validateParamsUUID(["id"]), deleteRefund);
 
 export default router;
 

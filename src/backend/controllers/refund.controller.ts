@@ -97,3 +97,16 @@ export const initiateRefund = async (
   }
 };
 
+
+export const deleteRefund = async (req: any, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    await AdminRefundService.deleteRefund(id);
+    res.status(200).json({
+      status: "success",
+      message: "Refund archived successfully"
+    });
+  } catch (error) {
+    next(error);
+  }
+};

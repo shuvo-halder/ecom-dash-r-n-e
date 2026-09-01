@@ -119,7 +119,7 @@ export class AdminShipmentService {
     const limit = Math.min(50, Math.max(1, options.limit || 10));
     const skip = (page - 1) * limit;
 
-    const where: any = {};
+    const where: any = { deletedAt: null };
 
     if (options.status) {
       where.status = options.status as ShipmentStatus;
@@ -327,5 +327,18 @@ export class AdminShipmentService {
     }
 
     return updatedShipmentTransaction;
+    }
+
+  static async deleteShipment(id: string) {
+    const shipment = await prisma.shipment.findFirst({
+      where: { id, deletedAt: null }
+    });
+    if (!shipment) {
+      throw new AppError("Shipment not found", 404, "SHIPMENT_NOT_FOUND");
+    }
+    return await prisma.shipment.update({
+      where: { id },
+      data: { deletedAt: new Date() }
+    });
   }
 }

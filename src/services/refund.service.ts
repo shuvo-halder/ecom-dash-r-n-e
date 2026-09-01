@@ -30,3 +30,8 @@ export const initiateRefund = async (payload: { orderId: string; paymentId: stri
   return data.data?.refund || data.data;
 };
 
+
+export const deleteRefund = async (id: string) => {
+  const { data } = await api.delete(`/refunds/${id}`);
+  return data;
+};

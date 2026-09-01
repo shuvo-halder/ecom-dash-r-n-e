@@ -29,3 +29,8 @@ export const receiveReturn = async (id: string, adminNotes?: string) => {
   const { data } = await api.post(`/returns/${id}/receive`, { adminNotes });
   return data.data.returnRequest;
 };
+
+export const deleteReturn = async (id: string) => {
+  const { data } = await api.delete(`/returns/${id}`);
+  return data;
+};

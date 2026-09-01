@@ -17,10 +17,11 @@ import {
   Clock,
   Package,
   Truck,
+  Trash2,
   XCircle,
   RotateCcw
 } from "lucide-react";
-import { getOrders, updateOrderStatus } from "../../../services/order.service";
+import { getOrders, updateOrderStatus, deleteOrder } from "../../../services/order.service";
 import { Button } from "../../../components/ui/button";
 import { Input } from "../../../components/ui/input";
 import { useAuth } from "../../../context/AuthContext";
@@ -101,6 +102,17 @@ export function OrdersList() {
     setNewStatus(order.status);
     setNewPaymentStatus(order.paymentStatus || "Unpaid");
     setStatusModalOpen(true);
+  };
+
+  const handleDeleteOrder = async (id: string) => {
+    if (!window.confirm("Are you sure you want to archive this order and all related operational records?")) return;
+    try {
+      await deleteOrder(id);
+      notify.success("Order archived successfully.");
+      fetchOrders();
+    } catch (err: any) {
+      notify.apiError(err, "Failed to archive order.");
+    }
   };
 
   const handleUpdateStatus = async (e: React.FormEvent) => {
@@ -338,6 +350,16 @@ export function OrdersList() {
                           <Printer className="w-4 h-4 text-muted-foreground" />
                         </Button>
                       </div>
+                        {hasPermission("Orders", "write") && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteOrder(order.id)}
+                            title="Archive Order"
+                          >
+                            <Trash2 className="w-4 h-4 text-rose-500" />
+                          </Button>
+                        )}
                     </td>
                   </tr>
                 ))}

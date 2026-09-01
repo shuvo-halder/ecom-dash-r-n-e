@@ -45,4 +45,16 @@ export class PaymentController {
       next(error);
     }
   }
+  static async deletePayment(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      await AdminPaymentService.deletePayment(id);
+      return res.json({
+        status: "success",
+        message: "Payment archived successfully"
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }

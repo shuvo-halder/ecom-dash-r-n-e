@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import {
   getReturns,
+  deleteReturn,
   approveReturn,
   rejectReturn,
   receiveReturn,
@@ -21,6 +22,7 @@ import {
   ChevronRight,
   Eye,
   RotateCcw,
+  Trash2,
   Clock,
   CheckCircle2,
   XCircle,
@@ -54,6 +56,14 @@ export function ReturnsList() {
   const pagination = responseData?.pagination || { page: 1, totalPages: 1, total: 0 };
 
   // Approve Mutation
+  const deleteMutation = useMutation({
+    mutationFn: deleteReturn,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["returns"] });
+      notify.success("Archived", "Return request archived successfully");
+    },
+  });
+
   const approveMutation = useMutation({
     mutationFn: (id: string) => approveReturn(id, actionNotes),
     onSuccess: () => {
@@ -321,6 +331,15 @@ export function ReturnsList() {
                             <Eye className="w-4 h-4 text-muted-foreground" />
                           </Link>
                         </Button>
+                        {canWrite && (
+                          <Button variant="ghost" size="icon" onClick={() => {
+                            if(window.confirm("Archive this return request?")) {
+                              deleteMutation.mutate(rma.id);
+                            }
+                          }}>
+                            <Trash2 className="w-4 h-4 text-rose-500" />
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
