@@ -447,15 +447,16 @@ export const deleteCoupon = asyncHandler(async (req: Request, res: Response) => 
 });
 
 export const validateCoupon = asyncHandler(async (req: Request, res: Response) => {
-  const { code, cartItems, customerId, customerEmail, email } = req.body;
+  const { code, couponCode, promoCode, cartItems, customerId, customerEmail, email } = req.body;
+  const targetCode = (code || couponCode || promoCode || "").trim();
 
-  if (!code) {
+  if (!targetCode) {
     throw new AppError("Coupon code is required", 400, "BAD_REQUEST");
   }
 
   const coupon = await prisma.coupon.findFirst({
     where: {
-      code: { equals: code.trim(), mode: "insensitive" },
+      code: { equals: targetCode, mode: "insensitive" },
       deletedAt: null,
     },
   });

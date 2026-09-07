@@ -3,6 +3,16 @@ import { asyncHandler } from "../utils/asyncHandler";
 import { prisma } from "../config/db";
 import { AppError } from "../utils/AppError";
 
+const safeParseRules = (rules: any) => {
+  if (!rules) return {};
+  if (typeof rules === "object") return rules;
+  try {
+    return JSON.parse(rules);
+  } catch {
+    return {};
+  }
+};
+
 export const getAllPromotions = asyncHandler(async (req: Request, res: Response) => {
   const { status, type } = req.query;
 
@@ -30,7 +40,7 @@ export const getAllPromotions = asyncHandler(async (req: Request, res: Response)
   const result = promotions.map((promo) => {
     return {
       ...promo,
-      parsedRules: promo.rules ? JSON.parse(promo.rules) : {},
+      parsedRules: safeParseRules(promo.rules),
       stats: {
         revenueImpact: "৳3,450.00",
         ordersGenerated: 28,
@@ -57,7 +67,7 @@ export const getPromotionById = asyncHandler(async (req: Request, res: Response)
     success: true,
     data: {
       ...promotion,
-      parsedRules: promotion.rules ? JSON.parse(promotion.rules) : {},
+      parsedRules: safeParseRules(promotion.rules),
     },
   });
 });
@@ -205,7 +215,7 @@ export const applyPromotions = asyncHandler(async (req: Request, res: Response) 
       continue;
     }
 
-    const rules = promo.rules ? JSON.parse(promo.rules) : {};
+    const rules = safeParseRules(promo.rules);
     let discount = 0;
 
     if (promo.type === "cart_discount" && promo.discountValue) {

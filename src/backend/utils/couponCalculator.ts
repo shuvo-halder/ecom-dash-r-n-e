@@ -151,11 +151,13 @@ export function calculateCouponDiscount(params: CalculateCouponParams): CouponCa
     return createInvalidResult("LIMIT_REACHED", "Coupon usage limit has been reached");
   }
 
-  // 4. Per-customer usage limit check (for authenticated customers)
-  if (customerId && coupon.usagePerCustomer !== null && coupon.usagePerCustomer !== undefined) {
-    const usageCount = customerOrderCountWithCoupon ?? 0;
-    if (usageCount >= coupon.usagePerCustomer) {
-      return createInvalidResult("CUSTOMER_LIMIT_REACHED", "You have reached the maximum usage limit for this coupon");
+  // 4. Per-customer usage limit check (for authenticated customers and email-identified guests)
+  if (coupon.usagePerCustomer !== null && coupon.usagePerCustomer !== undefined) {
+    if (customerId || (customerOrderCountWithCoupon !== undefined && customerOrderCountWithCoupon > 0)) {
+      const usageCount = customerOrderCountWithCoupon ?? 0;
+      if (usageCount >= coupon.usagePerCustomer) {
+        return createInvalidResult("CUSTOMER_LIMIT_REACHED", "You have reached the maximum usage limit for this coupon");
+      }
     }
   }
 

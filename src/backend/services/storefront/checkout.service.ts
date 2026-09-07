@@ -280,7 +280,20 @@ export class StorefrontCheckoutService {
       throw new AppError("Cart is empty", 400, "EMPTY_CART");
     }
 
-    const couponItems = cart.items.map((item) => {
+    const validCartItems = cart.items.filter(
+      (item) =>
+        item.product &&
+        item.product.isActive &&
+        item.product.status === "Active" &&
+        !item.product.deletedAt &&
+        (!item.variantId || (item.variant && item.variant.isActive && !item.variant.deletedAt))
+    );
+
+    if (validCartItems.length === 0) {
+      throw new AppError("Cart has no available items", 400, "EMPTY_CART");
+    }
+
+    const couponItems = validCartItems.map((item) => {
       const unitPrice = item.variant
         ? new Prisma.Decimal(item.variant.price)
         : new Prisma.Decimal(item.product.price || 0);
@@ -327,6 +340,28 @@ export class StorefrontCheckoutService {
       where: identifier.customerId ? { customerId: identifier.customerId } : { sessionId: identifier.sessionId },
       data: { couponId: coupon.id },
     });
+
+    return this.getCheckoutSession(identifier);
+  }
+
+  /**
+   * Removes any applied coupon from the user checkout session
+   */
+  static async removeCoupon(identifier: CartIdentifier) {
+    const whereClause = identifier.customerId
+      ? { customerId: identifier.customerId }
+      : { sessionId: identifier.sessionId };
+
+    const cart = await prisma.cart.findFirst({
+      where: whereClause,
+    });
+
+    if (cart && cart.couponId) {
+      await prisma.cart.update({
+        where: whereClause,
+        data: { couponId: null },
+      });
+    }
 
     return this.getCheckoutSession(identifier);
   }
@@ -591,7 +626,17 @@ export class StorefrontCheckoutService {
           throw new AppError("Coupon usage limit exceeded", 400, "COUPON_LIMIT_REACHED");
         }
 
-        const targetEmail = ((finalShippingAddress && finalShippingAddress.email) || (finalBillingAddress && finalBillingAddress.email) || "").trim();
+        let targetEmail = ((finalShippingAddress && finalShippingAddress.email) || (finalBillingAddress && finalBillingAddress.email) || "").trim();
+        if (!targetEmail && identifier.customerId) {
+          const custRecord = await tx.customer.findUnique({
+            where: { id: identifier.customerId },
+            select: { email: true },
+          });
+          if (custRecord?.email) {
+            targetEmail = custRecord.email.trim();
+          }
+        }
+
         if (coupon.usagePerCustomer !== null) {
           if (identifier.customerId || targetEmail) {
             const customerOrderCountWithCoupon = await tx.order.count({
@@ -648,7 +693,7 @@ export class StorefrontCheckoutService {
       const shippingCalcResult = calculateShippingFee({
         subtotal,
         shippingAddress: finalShippingAddress,
-        appliedCoupon: coupon ? { discountType: coupon.discountType, isFreeShipping: coupon.isFreeShipping } : null,
+        appliedCoupon: coupon ? { discountType: coupon.discountType, isFreeShipping: coupon.discountType === "free_shipping" } : null,
         shippingSetting,
       });
       const shippingFee = shippingCalcResult.shippingFee;
@@ -668,6 +713,17 @@ export class StorefrontCheckoutService {
       const randomPart = Math.floor(100000 + Math.random() * 900000);
       const orderNumber = `ORD-${Date.now().toString().slice(-6)}-${randomPart}`;
 
+      let resolvedCustomerEmail = ((finalShippingAddress && finalShippingAddress.email) || (finalBillingAddress && finalBillingAddress.email) || "").trim() || null;
+      if (!resolvedCustomerEmail && identifier.customerId) {
+        const custRecord = await tx.customer.findUnique({
+          where: { id: identifier.customerId },
+          select: { email: true },
+        });
+        if (custRecord?.email) {
+          resolvedCustomerEmail = custRecord.email.trim();
+        }
+      }
+
       // 7. Create Order using exact authoritative calculated values
       const newOrder = await tx.order.create({
         data: {
@@ -676,7 +732,7 @@ export class StorefrontCheckoutService {
           status: "Pending",
           paymentStatus: "Unpaid",
           totalAmount: grandTotal,
-          customerEmail: (finalShippingAddress && finalShippingAddress.email) || (finalBillingAddress && finalBillingAddress.email) || null,
+          customerEmail: resolvedCustomerEmail,
           subtotal: subtotal.toDecimalPlaces(2),
           taxAmount: taxAmount.toDecimalPlaces(2),
           shippingFee: shippingFee.toDecimalPlaces(2),

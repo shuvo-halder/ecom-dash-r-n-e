@@ -2,6 +2,7 @@ import { Response, NextFunction } from "express";
 import crypto from "crypto";
 import { CustomerAuthRequest } from "../../middlewares/customerAuth";
 import { StorefrontCartService, CartIdentifier } from "../../services/storefront/cart.service";
+import { StorefrontCheckoutService } from "../../services/storefront/checkout.service";
 
 const resolveCartIdentifier = (req: CustomerAuthRequest, res: Response): CartIdentifier => {
   const customerId = req.customer?.id;
@@ -132,6 +133,55 @@ export const clearCart = async (
     res.status(200).json({
       status: "success",
       message: "Cart cleared successfully",
+      data: {
+        cart,
+        ...cart,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const applyCartCoupon = async (
+  req: CustomerAuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const identifier = resolveCartIdentifier(req, res);
+    const { couponCode } = req.body;
+
+    await StorefrontCheckoutService.applyCoupon(identifier, couponCode);
+    const cart = await StorefrontCartService.getCart(identifier);
+
+    res.status(200).json({
+      status: "success",
+      message: "Coupon applied successfully",
+      data: {
+        cart,
+        ...cart,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const removeCartCoupon = async (
+  req: CustomerAuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const identifier = resolveCartIdentifier(req, res);
+
+    await StorefrontCheckoutService.removeCoupon(identifier);
+    const cart = await StorefrontCartService.getCart(identifier);
+
+    res.status(200).json({
+      status: "success",
+      message: "Coupon removed successfully",
       data: {
         cart,
         ...cart,

@@ -149,24 +149,17 @@ export class StorefrontContentService {
 
   async getPublicCoupons() {
     const now = new Date();
-    return prisma.coupon.findMany({
+    const coupons = await prisma.coupon.findMany({
       where: {
         isActive: true,
         deletedAt: null,
         validFrom: { lte: now },
         validUntil: { gte: now },
-        OR: [
-          { usageLimit: null },
-          { 
-            AND: [
-              { usageLimit: { not: null } },
-              { usedCount: { lt: prisma.coupon.fields.usageLimit } }
-            ]
-          }
-        ]
       },
       orderBy: { createdAt: "desc" }
     });
+
+    return coupons.filter(c => c.usageLimit === null || c.usedCount < c.usageLimit);
   }
 
   async getActiveCampaigns() {

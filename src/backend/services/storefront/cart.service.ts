@@ -1,5 +1,7 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "../../config/db";
 import { AppError } from "../../utils/AppError";
+import { calculateCouponDiscount } from "../../utils/couponCalculator";
 
 export interface CartIdentifier {
   customerId?: string;
@@ -36,6 +38,8 @@ export class StorefrontCartService {
                 name: true,
                 slug: true,
                 price: true,
+                categoryId: true,
+                brandId: true,
                 isActive: true,
                 status: true,
                 deletedAt: true,
@@ -89,6 +93,8 @@ export class StorefrontCartService {
                   name: true,
                   slug: true,
                   price: true,
+                  categoryId: true,
+                  brandId: true,
                   isActive: true,
                   status: true,
                   deletedAt: true,
@@ -164,16 +170,77 @@ export class StorefrontCartService {
 
     const itemCount = itemsWithPricing.reduce((sum, item) => sum + item.quantity, 0);
 
+    let discount = 0;
+    let appliedCoupon: any = null;
+
+    if (cart.couponId) {
+      const coupon = await dbClient.coupon.findFirst({
+        where: { id: cart.couponId, deletedAt: null },
+      });
+
+      if (coupon) {
+        let customerOrderCountWithCoupon = 0;
+        if (coupon.usagePerCustomer !== null && identifier.customerId) {
+          customerOrderCountWithCoupon = await dbClient.order.count({
+            where: {
+              couponId: coupon.id,
+              customerId: identifier.customerId,
+              status: { not: "Cancelled" },
+            },
+          });
+        }
+
+        const couponItems = validItems.map((item) => {
+          const unitPrice = item.variant
+            ? new Prisma.Decimal(item.variant.price)
+            : new Prisma.Decimal(item.product.price || 0);
+          return {
+            productId: item.productId,
+            categoryId: item.product.categoryId,
+            brandId: item.product.brandId,
+            quantity: item.quantity,
+            unitPrice,
+            subtotal: unitPrice.mul(item.quantity),
+          };
+        });
+
+        const calcResult = calculateCouponDiscount({
+          coupon,
+          items: couponItems,
+          customerId: identifier.customerId,
+          customerOrderCountWithCoupon,
+        });
+
+        if (calcResult.isValid) {
+          discount = Number(calcResult.discountAmount);
+          appliedCoupon = {
+            id: coupon.id,
+            code: coupon.code,
+            discountType: coupon.discountType,
+            discountValue: calcResult.discountValue,
+            isFreeShipping: calcResult.isFreeShipping,
+          };
+        } else {
+          await dbClient.cart.update({
+            where: { id: cart.id },
+            data: { couponId: null },
+          });
+        }
+      }
+    }
+
     return {
       id: cart.id,
       customerId: cart.customerId || null,
       sessionId: cart.sessionId || null,
+      couponId: appliedCoupon ? appliedCoupon.id : null,
+      coupon: appliedCoupon,
       itemCount,
       subtotal,
-      discount: 0,
+      discount,
       shippingFee: 0,
       estimatedTax: 0,
-      total: subtotal,
+      total: Math.max(0, subtotal - discount),
       items: itemsWithPricing,
       createdAt: cart.createdAt,
       updatedAt: cart.updatedAt,

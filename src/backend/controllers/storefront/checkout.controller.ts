@@ -73,6 +73,29 @@ export const applyCoupon = async (
 };
 
 /**
+ * DELETE /api/storefront/v1/checkout/coupon
+ * Removes the applied coupon from the active checkout session.
+ */
+export const removeCoupon = async (
+  req: CustomerAuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const identifier = resolveCartIdentifier(req, res);
+    const session = await StorefrontCheckoutService.removeCoupon(identifier);
+
+    res.status(200).json({
+      status: "success",
+      message: "Coupon removed successfully",
+      data: { session },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * POST /api/storefront/v1/checkout/shipping
  * Updates shipping and billing address selections.
  */

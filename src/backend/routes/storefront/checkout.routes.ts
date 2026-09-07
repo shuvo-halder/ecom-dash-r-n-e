@@ -2,6 +2,7 @@ import express from "express";
 import {
   getCheckoutSession,
   applyCoupon,
+  removeCoupon,
   updateAddresses,
   completeCheckout,
 } from "../../controllers/storefront/checkout.controller";
@@ -22,6 +23,8 @@ router.get("/session", getCheckoutSession);
 router.post("/session", getCheckoutSession);
 
 router.post("/coupon", validateBody(applyCouponSchema), applyCoupon);
+router.delete("/coupon", removeCoupon);
+router.post("/coupon/remove", removeCoupon);
 router.post("/shipping", validateBody(updateShippingSchema), updateAddresses);
 router.post("/complete", validateBody(completeCheckoutSchema), completeCheckout);
 
