@@ -110,7 +110,7 @@ export function CreatePathaoShipmentModal({
         setCities(citiesData);
       } catch (err: any) {
         console.error("Failed to load initial Pathao options", err);
-        setError("Failed to load Pathao store or city options. Please check credentials or network.");
+        setError("PATHAO_NOT_CONFIGURED: Pathao Courier API is not configured or credentials are not yet active. You can configure credentials in Settings > Shipping, or fulfill this order using Manual Courier.");
       } finally {
         setLoadingInitial(false);
       }

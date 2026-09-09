@@ -1,6 +1,7 @@
 import { prisma } from "../../config/db";
 import { pathaoClient } from "./pathao.client";
 import { PathaoDeliveryRequest, PathaoDeliveryResponse, PathaoResponse } from "./pathao.types";
+import { PathaoStatusSyncService } from "./pathao-sync.service";
 import { logger } from "../../config/logger";
 import { AppError } from "../../utils/AppError";
 import { Shipment, ShipmentStatus } from "@prisma/client";
@@ -345,39 +346,16 @@ export class PathaoDeliveryService {
       const info = response.data?.data;
       const orderStatus = info?.order_status || info?.order_status_slug || shipment.providerStatus;
 
-      let internalStatus = shipment.status;
-      const normalized = (orderStatus || "").toLowerCase();
-      if (normalized.includes("delivered")) {
-        internalStatus = ShipmentStatus.DELIVERED;
-      } else if (normalized.includes("cancel")) {
-        internalStatus = ShipmentStatus.CANCELLED;
-      } else if (normalized.includes("return")) {
-        internalStatus = ShipmentStatus.RETURNED;
-      } else if (
-        normalized.includes("in transit") ||
-        normalized.includes("picked") ||
-        normalized.includes("shipped")
-      ) {
-        internalStatus = ShipmentStatus.SHIPPED;
+      if (orderStatus) {
+        const syncResult = await PathaoStatusSyncService.applyStatusUpdate(shipmentId, orderStatus, {
+          source: "manual",
+          payload: response.data,
+          location: info?.hub_name || undefined,
+        });
+        return syncResult.shipment;
       }
 
-      const updated = await prisma.shipment.update({
-        where: { id: shipmentId },
-        data: {
-          providerStatus: orderStatus,
-          status: internalStatus,
-          lastSyncAt: new Date(),
-          syncMetadata: response.data ? JSON.parse(JSON.stringify(response.data)) : undefined,
-          ...(internalStatus === ShipmentStatus.DELIVERED && !shipment.deliveredAt
-            ? { deliveredAt: new Date() }
-            : {}),
-          ...(internalStatus === ShipmentStatus.SHIPPED && !shipment.shippedAt
-            ? { shippedAt: new Date() }
-            : {}),
-        },
-      });
-
-      return updated;
+      return shipment;
     } catch (error: any) {
       logger.warn(`[PathaoDeliveryService] Error refreshing status for ${shipment.consignmentId}`, {
         error: error.response?.data || error.message,

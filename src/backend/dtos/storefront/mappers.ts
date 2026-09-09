@@ -157,14 +157,49 @@ export function mapOrderToStorefrontDTO(order: any) {
 }
 
 export function mapShipmentToStorefrontDTO(shipment: any) {
+  const rawProvider = (shipment.provider || "").toUpperCase().trim();
+  const courierName = shipment.courier?.name;
+  const trackingNumber = shipment.trackingNumber || shipment.consignmentId || null;
+
+  let provider = "MANUAL";
+  let providerName = courierName || "Manual / In-House Courier";
+  let trackingUrl = shipment.trackingUrl || null;
+
+  if (rawProvider === "PATHAO" || courierName?.toLowerCase().includes("pathao")) {
+    provider = "PATHAO";
+    providerName = "Pathao Courier";
+    if (!trackingUrl && trackingNumber) {
+      trackingUrl = `https://merchant.pathao.com/tracking?consignment_id=${trackingNumber}`;
+    }
+  } else if (rawProvider === "MANUAL") {
+    provider = "MANUAL";
+    providerName = courierName || "Manual / In-House Courier";
+  } else if (courierName) {
+    provider = rawProvider || "COURIER";
+    providerName = courierName;
+    if (!trackingUrl && shipment.courier?.trackingUrl && trackingNumber) {
+      trackingUrl = `${shipment.courier.trackingUrl}${trackingNumber}`;
+    }
+  } else if (rawProvider) {
+    provider = rawProvider;
+    providerName = `${rawProvider.charAt(0).toUpperCase()}${rawProvider.slice(1).toLowerCase()} Courier`;
+  }
+
   return {
     id: shipment.id,
-    trackingNumber: shipment.trackingNumber,
+    shipmentId: shipment.id,
+    provider,
+    providerName,
+    carrier: providerName,
+    courierName: providerName,
     status: shipment.status,
-    shippedAt: shipment.shippedAt,
-    estimatedDelivery: shipment.estimatedDelivery,
-    courierName: shipment.courier?.name,
-    trackingUrl: shipment.courier?.trackingUrlPrefix ? `${shipment.courier.trackingUrlPrefix}${shipment.trackingNumber}` : null,
+    shipmentStatus: shipment.status,
+    trackingNumber,
+    trackingUrl,
+    shippedAt: shipment.shippedAt || null,
+    estimatedDelivery: shipment.estimatedDelivery || null,
+    estimatedDeliveryAt: shipment.estimatedDelivery || null,
+    deliveredAt: shipment.deliveredAt || null,
     createdAt: shipment.createdAt,
     items: shipment.items?.map((item: any) => ({
       id: item.id,

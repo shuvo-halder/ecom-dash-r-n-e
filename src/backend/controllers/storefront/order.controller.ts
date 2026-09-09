@@ -1,4 +1,4 @@
-import { Response, NextFunction } from "express";
+import { Request, Response, NextFunction } from "express";
 import { CustomerAuthRequest } from "../../middlewares/customerAuth";
 import { StorefrontOrderService } from "../../services/storefront/order.service";
 import { StorefrontShipmentService } from "../../services/storefront/shipment.service";
@@ -87,6 +87,28 @@ export const getMyOrderTracking = async (req: CustomerAuthRequest, res: Response
     const customerId = req.customer!.id;
     const orderId = req.params.id || req.params.orderId;
     const result = await StorefrontShipmentService.getOrderTracking(customerId, orderId);
+    res.status(200).json({ status: "success", data: result });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const trackGuestOrder = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orderNumber =
+      (req.body?.orderNumber as string) ||
+      (req.query?.orderNumber as string) ||
+      (req.params?.orderNumber as string);
+
+    const phoneOrEmail =
+      (req.body?.phoneOrEmail as string) ||
+      (req.body?.email as string) ||
+      (req.body?.phone as string) ||
+      (req.query?.phoneOrEmail as string) ||
+      (req.query?.email as string) ||
+      (req.query?.phone as string);
+
+    const result = await StorefrontShipmentService.getGuestOrderTracking(orderNumber, phoneOrEmail);
     res.status(200).json({ status: "success", data: result });
   } catch (error) {
     next(error);

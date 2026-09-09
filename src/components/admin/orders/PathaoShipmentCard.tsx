@@ -11,15 +11,18 @@ import {
   Clock,
   Banknote,
   PackageCheck,
-  AlertCircle
+  AlertCircle,
+  FileText,
+  Layers
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "../../ui/card";
 import { Button } from "../../ui/button";
 import { Badge } from "../../ui/badge";
 import { ConfirmDialog } from "../../common/ConfirmDialog";
-import { CreatePathaoShipmentModal } from "./CreatePathaoShipmentModal";
+import { CreateShipmentModal } from "./CreateShipmentModal";
 import { PathaoTrackingModal } from "./PathaoTrackingModal";
 import { refreshPathaoShipment, cancelPathaoShipment } from "../../../services/pathao.service";
+import { updateShipmentStatus } from "../../../services/shipment.service";
 import { notify } from "../../../lib/notify";
 
 interface PathaoShipmentCardProps {
@@ -28,7 +31,7 @@ interface PathaoShipmentCardProps {
   canManage: boolean;
 }
 
-export function PathaoShipmentCard({
+export function OrderShipmentCard({
   order,
   onOrderUpdated,
   canManage = false,
@@ -43,23 +46,36 @@ export function PathaoShipmentCard({
   const [cancelling, setCancelling] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  // Find Pathao shipment if exists (prefer the latest non-cancelled or latest)
-  const pathaoShipments = (order.shipments || []).filter((s: any) => s.provider === "pathao");
+  // Find any active shipment (prefer the latest non-cancelled or latest)
+  const allShipments = (order.shipments || []).filter((s: any) => !s.deletedAt);
   const activeShipment =
-    pathaoShipments.find((s: any) => s.status !== "CANCELLED" && s.status !== "FAILED_DELIVERY") ||
-    pathaoShipments[0] ||
+    allShipments.find((s: any) => s.status !== "CANCELLED" && s.status !== "FAILED_DELIVERY") ||
+    allShipments[0] ||
     null;
 
-  const consignmentId = activeShipment?.consignmentId || activeShipment?.trackingNumber || "N/A";
+  const providerName =
+    activeShipment?.provider === "manual"
+      ? "Manual Courier"
+      : activeShipment?.provider === "pathao"
+      ? "Pathao Courier"
+      : activeShipment?.provider
+      ? `${activeShipment.provider.toUpperCase()} Courier`
+      : "Manual Courier";
+
+  const trackingRef =
+    activeShipment?.trackingNumber || activeShipment?.consignmentId || "N/A";
+
   const trackingUrl =
     activeShipment?.trackingUrl ||
-    (consignmentId !== "N/A"
-      ? `https://merchant.pathao.com/tracking?consignment_id=${consignmentId}`
+    (activeShipment?.provider === "pathao" && trackingRef !== "N/A"
+      ? `https://merchant.pathao.com/tracking?consignment_id=${trackingRef}`
       : null);
 
   // Action eligibility validations
   const isOrderTerminal =
-    order.status?.toLowerCase() === "cancelled" || order.status?.toLowerCase() === "refunded";
+    order.status?.toLowerCase() === "cancelled" ||
+    order.status?.toLowerCase() === "refunded" ||
+    order.status?.toLowerCase() === "returned";
 
   const isShipmentDelivered = activeShipment?.status === "DELIVERED";
   const isShipmentCancelled = activeShipment?.status === "CANCELLED";
@@ -69,12 +85,12 @@ export function PathaoShipmentCard({
     !isShipmentCancelled &&
     canManage;
 
-  const handleCopyConsignment = () => {
-    if (consignmentId && consignmentId !== "N/A") {
-      navigator.clipboard.writeText(consignmentId);
+  const handleCopyTracking = () => {
+    if (trackingRef && trackingRef !== "N/A") {
+      navigator.clipboard.writeText(trackingRef);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-      notify.success("Copied to clipboard", consignmentId);
+      notify.success("Copied tracking reference", trackingRef);
     }
   };
 
@@ -82,11 +98,15 @@ export function PathaoShipmentCard({
     if (!activeShipment) return;
     setRefreshing(true);
     try {
-      const updated = await refreshPathaoShipment(activeShipment.id);
-      notify.success(
-        "Shipment Status Refreshed",
-        `Current Status: ${updated.providerStatus || updated.status}`
-      );
+      if (activeShipment.provider === "pathao") {
+        const updated = await refreshPathaoShipment(activeShipment.id);
+        notify.success(
+          "Shipment Status Refreshed",
+          `Current Status: ${updated.providerStatus || updated.status}`
+        );
+      } else {
+        notify.info("Status Refreshed", `Shipment status: ${activeShipment.status}`);
+      }
       onOrderUpdated();
     } catch (err: any) {
       notify.apiError(err, "Failed to refresh shipment status.");
@@ -99,8 +119,12 @@ export function PathaoShipmentCard({
     if (!activeShipment) return;
     setCancelling(true);
     try {
-      await cancelPathaoShipment(activeShipment.id, "Cancelled by admin from order details");
-      notify.success("Shipment Cancelled", `Consignment ${consignmentId} has been cancelled.`);
+      if (activeShipment.provider === "pathao") {
+        await cancelPathaoShipment(activeShipment.id, "Cancelled by admin from order details");
+      } else {
+        await updateShipmentStatus(activeShipment.id, "CANCELLED");
+      }
+      notify.success("Shipment Cancelled", `Shipment reference ${trackingRef} marked as Cancelled.`);
       setConfirmCancelOpen(false);
       onOrderUpdated();
     } catch (err: any) {
@@ -136,34 +160,40 @@ export function PathaoShipmentCard({
     if (st.includes("transit") || st.includes("shipped") || st.includes("picked")) {
       return (
         <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300">
-          <Truck className="w-3.5 h-3.5" /> In Transit
+          <Truck className="w-3.5 h-3.5" /> {status === "SHIPPED" ? "Shipped" : "In Transit"}
         </span>
       );
     }
     return (
       <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">
-        <Clock className="w-3.5 h-3.5" /> Pending
+        <Clock className="w-3.5 h-3.5" /> {status || "Processing"}
       </span>
     );
   };
 
+  const shipmentNotes =
+    activeShipment?.providerMetadata?.notes || activeShipment?.notes;
+
   return (
     <>
-      <Card id="pathao-shipment-card" className="border shadow-xs">
+      <Card id="order-shipment-card" className="border shadow-xs">
         <CardHeader className="p-5 pb-3 border-b flex flex-row items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+            <div className="p-1.5 rounded-md bg-primary/10 text-primary">
               <Truck className="w-4 h-4" />
             </div>
             <div>
               <CardTitle className="text-base font-bold flex items-center gap-2">
-                Pathao Shipment & Delivery
+                Shipment & Fulfillment
               </CardTitle>
             </div>
           </div>
 
           {activeShipment && (
             <div className="flex items-center gap-1.5">
+              <Badge variant="outline" className="text-[10px] uppercase font-mono">
+                {activeShipment.provider || "Manual"}
+              </Badge>
               {getStatusBadge(activeShipment.status, activeShipment.providerStatus)}
             </div>
           )}
@@ -171,15 +201,15 @@ export function PathaoShipmentCard({
 
         <CardContent className="p-5 space-y-4">
           {!activeShipment ? (
-            /* No Shipment State */
+            /* No Active Shipment State */
             <div className="py-3 text-center space-y-3">
               <div className="inline-flex p-3 rounded-full bg-muted/60 text-muted-foreground">
                 <Truck className="w-6 h-6" />
               </div>
               <div className="space-y-1">
-                <p className="text-sm font-semibold text-foreground">No Pathao Shipment Created</p>
+                <p className="text-sm font-semibold text-foreground">No Active Shipment</p>
                 <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-                  This order has not been dispatched to Pathao Courier yet. Generate a consignment to start tracking.
+                  This order has not been dispatched yet. Choose a courier provider (Manual Courier or Pathao) to create a shipment.
                 </p>
               </div>
 
@@ -192,14 +222,14 @@ export function PathaoShipmentCard({
 
               {canManage && (
                 <Button
-                  id="pathao-create-shipment-btn"
+                  id="btn-open-create-shipment"
                   size="sm"
                   disabled={isOrderTerminal}
                   onClick={() => setCreateModalOpen(true)}
-                  className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs mt-1"
+                  className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-medium text-xs mt-1"
                 >
                   <Truck className="w-3.5 h-3.5" />
-                  Create Pathao Shipment
+                  Create Shipment
                 </Button>
               )}
             </div>
@@ -211,43 +241,46 @@ export function PathaoShipmentCard({
                 <div className="p-3 text-xs bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 border border-rose-200 dark:border-rose-800 rounded-md flex items-start gap-2">
                   <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
                   <div>
-                    <p className="font-semibold">Delivery Creation Failed</p>
-                    <p className="text-[11px] mt-0.5">{activeShipment.providerError || "Courier service returned an error."}</p>
+                    <p className="font-semibold">Delivery Failed</p>
+                    <p className="text-[11px] mt-0.5">
+                      {activeShipment.providerError || "Courier service reported delivery failure."}
+                    </p>
                   </div>
                 </div>
               )}
 
               {/* Grid of Key Shipment Properties */}
               <div className="grid grid-cols-2 gap-3 text-xs">
-                {/* Consignment ID */}
+                {/* Tracking Reference */}
                 <div className="p-2.5 rounded-lg bg-muted/30 border border-border/60">
-                  <span className="text-muted-foreground block text-[11px] font-medium">Consignment ID</span>
+                  <span className="text-muted-foreground block text-[11px] font-medium">Tracking Reference</span>
                   <div className="flex items-center justify-between mt-0.5">
-                    <span className="font-mono font-bold text-foreground text-xs">{consignmentId}</span>
+                    <span className="font-mono font-bold text-foreground text-xs">{trackingRef}</span>
                     <Button
-                      id="copy-consignment-id-btn"
+                      id="copy-tracking-btn"
                       variant="ghost"
                       size="icon"
                       className="h-5 w-5 ml-1"
-                      onClick={handleCopyConsignment}
-                      title="Copy Consignment ID"
+                      onClick={handleCopyTracking}
+                      title="Copy Tracking Reference"
                     >
                       {copied ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
                     </Button>
                   </div>
                 </div>
 
-                {/* Merchant Order ID */}
+                {/* Courier Provider */}
                 <div className="p-2.5 rounded-lg bg-muted/30 border border-border/60">
-                  <span className="text-muted-foreground block text-[11px] font-medium">Merchant Order ID</span>
-                  <p className="font-mono font-semibold text-foreground text-xs mt-0.5 truncate">
-                    {activeShipment.merchantOrderId || "N/A"}
+                  <span className="text-muted-foreground block text-[11px] font-medium">Courier Provider</span>
+                  <p className="font-semibold text-foreground text-xs mt-0.5 flex items-center gap-1.5 truncate">
+                    <Truck className="w-3.5 h-3.5 text-primary shrink-0" />
+                    {providerName}
                   </p>
                 </div>
 
                 {/* COD Amount */}
                 <div className="p-2.5 rounded-lg bg-muted/30 border border-border/60">
-                  <span className="text-muted-foreground block text-[11px] font-medium">COD Collect Amount</span>
+                  <span className="text-muted-foreground block text-[11px] font-medium">COD Amount</span>
                   <p className="font-bold text-emerald-600 text-xs mt-0.5">
                     ৳{Number(activeShipment.codAmount || 0).toFixed(2)}
                   </p>
@@ -259,52 +292,40 @@ export function PathaoShipmentCard({
                   <p className="font-semibold text-foreground text-xs mt-0.5">
                     {activeShipment.deliveryFee !== null && activeShipment.deliveryFee !== undefined
                       ? `৳${Number(activeShipment.deliveryFee).toFixed(2)}`
-                      : "Pending"}
+                      : "0.00"}
                   </p>
                 </div>
               </div>
 
               {/* Extended Info Rows */}
               <div className="space-y-2 pt-2 border-t text-xs">
-                <div className="flex items-center justify-between text-muted-foreground">
-                  <span>Shipment Provider:</span>
-                  <span className="font-semibold text-foreground flex items-center gap-1">
-                    <Truck className="w-3 h-3 text-emerald-600" /> Pathao Courier
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between text-muted-foreground">
-                  <span>Pathao Provider Status:</span>
-                  <span className="font-medium text-foreground">
-                    {activeShipment.providerStatus || activeShipment.status}
-                  </span>
-                </div>
+                {shipmentNotes && (
+                  <div className="flex items-start justify-between text-muted-foreground">
+                    <span className="shrink-0 flex items-center gap-1">
+                      <FileText className="w-3 h-3 text-muted-foreground" /> Dispatch Notes:
+                    </span>
+                    <span className="font-medium text-foreground text-right pl-4">
+                      {shipmentNotes}
+                    </span>
+                  </div>
+                )}
 
                 <div className="flex items-center justify-between text-muted-foreground">
                   <span>Dispatched At:</span>
                   <span>{new Date(activeShipment.createdAt).toLocaleString()}</span>
                 </div>
 
-                <div className="flex items-center justify-between text-muted-foreground">
-                  <span>Last Status Sync:</span>
-                  <span>
-                    {activeShipment.lastSyncAt
-                      ? new Date(activeShipment.lastSyncAt).toLocaleString()
-                      : new Date(activeShipment.updatedAt).toLocaleString()}
-                  </span>
-                </div>
-
                 {trackingUrl && (
                   <div className="flex items-center justify-between pt-1">
-                    <span className="text-muted-foreground">Portal Link:</span>
+                    <span className="text-muted-foreground">Tracking Link:</span>
                     <a
-                      id="pathao-merchant-tracking-link"
+                      id="merchant-tracking-link"
                       href={trackingUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1 text-primary hover:underline font-semibold"
                     >
-                      Pathao Tracking Page <ExternalLink className="w-3 h-3" />
+                      Courier Portal <ExternalLink className="w-3 h-3" />
                     </a>
                   </div>
                 )}
@@ -315,25 +336,25 @@ export function PathaoShipmentCard({
                 <div className="flex items-center gap-2">
                   {/* View Tracking */}
                   <Button
-                    id="pathao-view-tracking-btn"
+                    id="btn-view-tracking"
                     variant="outline"
                     size="sm"
                     onClick={() => setTrackingModalOpen(true)}
                     className="gap-1.5 text-xs h-8"
                   >
-                    <Clock className="w-3.5 h-3.5 text-primary" /> View Tracking
+                    <Clock className="w-3.5 h-3.5 text-primary" /> View Timeline
                   </Button>
 
                   {/* Refresh Status */}
-                  {canManage && (
+                  {canManage && activeShipment.provider === "pathao" && (
                     <Button
-                      id="pathao-refresh-status-btn"
+                      id="btn-refresh-shipment-status"
                       variant="outline"
                       size="sm"
                       disabled={refreshing}
                       onClick={handleRefresh}
                       className="gap-1.5 text-xs h-8"
-                      title="Sync latest status from Pathao"
+                      title="Sync latest status from Courier"
                     >
                       <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} />
                       {refreshing ? "Syncing..." : "Refresh"}
@@ -346,7 +367,7 @@ export function PathaoShipmentCard({
                   <div>
                     {canCancelShipment ? (
                       <Button
-                        id="pathao-cancel-shipment-btn"
+                        id="btn-cancel-shipment"
                         variant="ghost"
                         size="sm"
                         disabled={cancelling}
@@ -368,9 +389,9 @@ export function PathaoShipmentCard({
         </CardContent>
       </Card>
 
-      {/* Create Shipment Modal */}
+      {/* Provider-Agnostic Create Shipment Modal */}
       {createModalOpen && (
-        <CreatePathaoShipmentModal
+        <CreateShipmentModal
           isOpen={createModalOpen}
           onClose={() => setCreateModalOpen(false)}
           order={order}
@@ -397,19 +418,19 @@ export function PathaoShipmentCard({
       <ConfirmDialog
         isOpen={confirmCancelOpen}
         onOpenChange={setConfirmCancelOpen}
-        title="Cancel Pathao Shipment?"
+        title="Cancel Shipment?"
         description={
           <div className="space-y-2">
             <p>
-              Are you sure you want to cancel Pathao consignment{" "}
-              <strong className="font-mono text-foreground">{consignmentId}</strong> for Order #{order.orderNumber}?
+              Are you sure you want to cancel shipment{" "}
+              <strong className="font-mono text-foreground">{trackingRef}</strong> for Order #{order.orderNumber}?
             </p>
             <p className="text-xs text-muted-foreground">
-              This will submit a cancellation request to Pathao and mark the shipment status as Cancelled. This operation is permanent.
+              This will update the shipment status to Cancelled.
             </p>
           </div>
         }
-        confirmText="Yes, Cancel Consignment"
+        confirmText="Yes, Cancel Shipment"
         cancelText="Keep Shipment"
         variant="destructive"
         isLoading={cancelling}
@@ -418,3 +439,6 @@ export function PathaoShipmentCard({
     </>
   );
 }
+
+// Backward compatibility alias for any existing imports
+export const PathaoShipmentCard = OrderShipmentCard;

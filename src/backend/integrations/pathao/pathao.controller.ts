@@ -1,6 +1,8 @@
 import { Response, NextFunction } from "express";
 import { PathaoLocationService } from "./pathao.service";
 import { PathaoDeliveryService } from "./pathao-delivery.service";
+import { PathaoStatusSyncService } from "./pathao-sync.service";
+import { PathaoConfig } from "./pathao.config";
 import { prisma } from "../../config/db";
 
 export const getPathaoCities = async (req: any, res: Response, next: NextFunction) => {
@@ -142,3 +144,42 @@ export const getPathaoShipment = async (req: any, res: Response, next: NextFunct
     next(error);
   }
 };
+
+/**
+ * Public webhook endpoint for Pathao courier callback notifications.
+ * Validates provider signature and synchronizes shipment and order state idempotently.
+ */
+export const handlePathaoWebhook = async (req: any, res: Response, next: NextFunction) => {
+  try {
+    const configuredSecret = PathaoConfig.webhookSecret || process.env.PATHAO_WEBHOOK_SECRET;
+
+    // Fast-acknowledgement & processing via sync service
+    const result = await PathaoStatusSyncService.handleWebhook(req.body, req.headers);
+
+    // Pathao Webhook spec acknowledgement header
+    if (configuredSecret) {
+      res.setHeader("X-Pathao-Merchant-Webhook-Integration-Secret", configuredSecret);
+    }
+
+    return res.status(200).json({
+      status: "success",
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Administrative endpoint to trigger active shipment status synchronization batch.
+ */
+export const syncPathaoShipmentsManually = async (req: any, res: Response, next: NextFunction) => {
+  try {
+    const batchSize = req.query.limit ? parseInt(req.query.limit, 10) : 25;
+    const stats = await PathaoStatusSyncService.syncActiveShipments(batchSize);
+    res.status(200).json({ status: "success", data: stats });
+  } catch (error) {
+    next(error);
+  }
+};
+

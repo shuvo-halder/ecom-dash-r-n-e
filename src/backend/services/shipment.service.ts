@@ -2,112 +2,382 @@ import { prisma } from "../config/db";
 import { emailService } from "./email.service";
 import { AppError } from "../utils/AppError";
 import { ShipmentStatus, TrackingStatus, NotificationType, NotificationChannel } from "@prisma/client";
+import { courierRegistry } from "../integrations/courier/courier-provider.registry";
+import { NormalizedShipmentRequest } from "../integrations/courier/courier.types";
+
+export interface CreateShipmentOptions {
+  orderId: string;
+  courierId?: string | null;
+  trackingNumber?: string | null;
+  items?: { orderItemId: string; quantity: number }[];
+  provider?: string;
+  deliveryFee?: number | null;
+  notes?: string | null;
+  idempotencyKey?: string | null;
+  recipientName?: string | null;
+  recipientPhone?: string | null;
+  recipientAddress?: string | null;
+  codAmount?: number | null;
+  weight?: number | null;
+  status?: string | null;
+  metadata?: Record<string, any>;
+}
 
 export class AdminShipmentService {
-  static async createShipment(orderId: string, courierId: string | undefined, trackingNumber: string | undefined, items: { orderItemId: string, quantity: number }[]) {
-    if (!items || items.length === 0) {
-      throw new AppError("At least one shipment item is required", 400, "INVALID_ITEMS");
+  /**
+   * Provider-agnostic shipment creation workflow.
+   * Flow: Admin -> Select Order -> Create Shipment -> Select Courier Provider -> Backend Shipment Service -> Provider Adapter -> Shipment
+   */
+  static async createShipment(
+    orderIdOrOptions: string | CreateShipmentOptions,
+    courierId?: string | null,
+    trackingNumber?: string | null,
+    items?: { orderItemId: string; quantity: number }[],
+    provider?: string,
+    additionalOptions?: {
+      deliveryFee?: number | null;
+      notes?: string | null;
+      idempotencyKey?: string | null;
+      status?: string | null;
+      metadata?: Record<string, any>;
+    }
+  ) {
+    const opts: CreateShipmentOptions =
+      typeof orderIdOrOptions === "object"
+        ? orderIdOrOptions
+        : {
+            orderId: orderIdOrOptions,
+            courierId,
+            trackingNumber,
+            items,
+            provider,
+            ...additionalOptions,
+          };
+
+    if (!opts.orderId) {
+      throw new AppError("Order ID is required", 400, "INVALID_ORDER_ID");
     }
 
+    // 1. Idempotency Check: if idempotencyKey is supplied and shipment already exists, return existing
+    if (opts.idempotencyKey) {
+      const existingByIdempotency = await prisma.shipment.findUnique({
+        where: { idempotencyKey: opts.idempotencyKey },
+        include: {
+          items: true,
+          trackingEvents: true,
+          order: { include: { customer: true } },
+          courier: true,
+        },
+      });
+      if (existingByIdempotency) {
+        return existingByIdempotency;
+      }
+    }
+
+    // 2. Resolve Courier Provider via Registry
+    const resolvedProviderId = (opts.provider || "").toLowerCase().trim() || "manual";
+    if (!courierRegistry.hasProvider(resolvedProviderId)) {
+      throw new AppError(
+        `Unsupported courier provider '${opts.provider}'. Available providers: ${courierRegistry
+          .getAllProviders()
+          .map((p) => p.id)
+          .join(", ")}`,
+        400,
+        "PROVIDER_NOT_FOUND"
+      );
+    }
+    const courierAdapter = courierRegistry.getProvider(resolvedProviderId);
+
+    // 3. Execute in Transaction with Order Row Lock & Validation
     return await prisma.$transaction(async (tx) => {
-      // 1. Lock Order row for transactional consistency
+      // Lock Order row for transactional consistency
       await tx.order.update({
-        where: { id: orderId },
+        where: { id: opts.orderId },
         data: { updatedAt: new Date() },
       });
 
-      // 2. Re-read fresh state with items & shipments under lock
+      // Fetch fresh state of Order, items, and non-deleted shipments
       const order = await tx.order.findUnique({
-        where: { id: orderId },
-        include: { items: true, shipments: { include: { items: true } } },
+        where: { id: opts.orderId },
+        include: {
+          customer: true,
+          items: { include: { product: true } },
+          shipments: {
+            where: { deletedAt: null },
+            include: { items: true },
+          },
+        },
       });
 
-      if (!order) {
+      if (!order || order.deletedAt) {
         throw new AppError("Order not found", 404, "ORDER_NOT_FOUND");
       }
 
-      if (order.status === "Cancelled") {
-        throw new AppError("Cannot create shipment for cancelled order", 400, "ORDER_CANCELLED");
+      // State Validation
+      const orderStatusLower = (order.status || "").toLowerCase();
+      if (orderStatusLower === "cancelled") {
+        throw new AppError("Cannot create shipment for a cancelled order", 400, "ORDER_CANCELLED");
+      }
+      if (orderStatusLower === "refunded" || orderStatusLower === "returned") {
+        throw new AppError(
+          `Cannot create shipment for order in '${order.status}' status`,
+          400,
+          "ORDER_TERMINAL"
+        );
+      }
+      if (orderStatusLower === "delivered") {
+        throw new AppError(
+          "Cannot create shipment for an already delivered order",
+          400,
+          "ORDER_ALREADY_DELIVERED"
+        );
+      }
+      if (!order.items || order.items.length === 0) {
+        throw new AppError("Order has no items to ship", 400, "NO_ITEMS_TO_SHIP");
       }
 
-      // 3. Validate quantities against authoritative order items and existing shipments
-      const orderItemMap = new Map(order.items.map(i => [i.id, i]));
+      // Idempotency: An order must not accidentally receive duplicate active shipments
+      const activeShipment = order.shipments.find(
+        (s) =>
+          s.status !== ShipmentStatus.CANCELLED &&
+          s.status !== ShipmentStatus.FAILED_DELIVERY
+      );
+
+      if (activeShipment) {
+        if (opts.idempotencyKey && activeShipment.idempotencyKey === opts.idempotencyKey) {
+          return activeShipment;
+        }
+        throw new AppError(
+          `Order already has an active shipment (${
+            activeShipment.trackingNumber || activeShipment.consignmentId || activeShipment.id
+          }). Duplicate active shipments are not permitted.`,
+          409,
+          "ACTIVE_SHIPMENT_EXISTS"
+        );
+      }
+
+      // Validate quantities against authoritative order items and previously shipped quantities
+      const orderItemMap = new Map(order.items.map((i) => [i.id, i]));
       const shippedMap = new Map<string, number>();
-      
+
       for (const shipment of order.shipments) {
-        for (const item of shipment.items) {
-          shippedMap.set(item.orderItemId, (shippedMap.get(item.orderItemId) || 0) + item.quantity);
+        if (shipment.status !== ShipmentStatus.CANCELLED) {
+          for (const item of shipment.items) {
+            shippedMap.set(
+              item.orderItemId,
+              (shippedMap.get(item.orderItemId) || 0) + item.quantity
+            );
+          }
         }
       }
 
-      for (const item of items) {
-        if (!item.quantity || item.quantity <= 0) {
-          throw new AppError("Shipment item quantity must be greater than zero", 400, "INVALID_QUANTITY");
+      let shipmentItems: { orderItemId: string; quantity: number }[] = [];
+
+      if (opts.items && opts.items.length > 0) {
+        for (const item of opts.items) {
+          if (!item.quantity || item.quantity <= 0) {
+            throw new AppError(
+              "Shipment item quantity must be greater than zero",
+              400,
+              "INVALID_QUANTITY"
+            );
+          }
+
+          const orderItem = orderItemMap.get(item.orderItemId);
+          if (!orderItem) {
+            throw new AppError(
+              `Item ${item.orderItemId} is not part of this order`,
+              400,
+              "INVALID_ITEM"
+            );
+          }
+
+          const orderedQty = orderItem.quantity;
+          const previouslyShipped = shippedMap.get(item.orderItemId) || 0;
+          const remainingToShip = orderedQty - previouslyShipped;
+
+          if (item.quantity > remainingToShip) {
+            throw new AppError(
+              `Cannot ship ${item.quantity} of item '${
+                orderItem.productName || item.orderItemId
+              }'. Only ${remainingToShip} remaining.`,
+              400,
+              "EXCEEDS_ORDERED_QUANTITY"
+            );
+          }
+
+          shippedMap.set(item.orderItemId, previouslyShipped + item.quantity);
+          shipmentItems.push({
+            orderItemId: item.orderItemId,
+            quantity: item.quantity,
+          });
+        }
+      } else {
+        // Default to all remaining unshipped items
+        for (const item of order.items) {
+          const previouslyShipped = shippedMap.get(item.id) || 0;
+          const remainingToShip = item.quantity - previouslyShipped;
+          if (remainingToShip > 0) {
+            shipmentItems.push({
+              orderItemId: item.id,
+              quantity: remainingToShip,
+            });
+          }
         }
 
-        const orderItem = orderItemMap.get(item.orderItemId);
-        if (!orderItem) {
-          throw new AppError(`Item ${item.orderItemId} is not part of this order`, 400, "INVALID_ITEM");
-        }
-
-        const orderedQty = orderItem.quantity;
-        const previouslyShipped = shippedMap.get(item.orderItemId) || 0;
-        const remainingToShip = orderedQty - previouslyShipped;
-
-        if (item.quantity > remainingToShip) {
+        if (shipmentItems.length === 0) {
           throw new AppError(
-            `Cannot ship ${item.quantity} of item ${item.orderItemId}. Only ${remainingToShip} remaining.`,
+            "All items in this order have already been shipped",
             400,
-            "EXCEEDS_ORDERED_QUANTITY"
+            "ALL_ITEMS_SHIPPED"
           );
         }
-
-        shippedMap.set(item.orderItemId, previouslyShipped + item.quantity);
       }
 
-      // 4. Create Shipment with ShipmentItems strictly inheriting OrderItem.warehouseId
+      // Build Normalized Shipment Request for Provider Adapter
+      const recipientName =
+        opts.recipientName ||
+        (order.customer
+          ? `${order.customer.firstName || ""} ${order.customer.lastName || ""}`.trim() ||
+            order.customer.email
+          : "Customer");
+      const recipientPhone = opts.recipientPhone || order.customer?.phone || "";
+      const recipientAddress = opts.recipientAddress || order.shippingAddress || "";
+
+      const isPaid = order.paymentStatus?.toLowerCase() === "paid";
+      const codAmount =
+        opts.codAmount !== undefined && opts.codAmount !== null
+          ? opts.codAmount
+          : isPaid
+          ? 0
+          : Number(order.totalAmount || 0);
+
+      const totalQty = shipmentItems.reduce((acc, it) => acc + it.quantity, 0);
+
+      const normalizedRequest: NormalizedShipmentRequest = {
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        merchantReference: opts.trackingNumber || undefined,
+        recipientName,
+        recipientPhone,
+        recipientAddress,
+        codAmount,
+        itemQuantity: totalQty,
+        itemWeight: opts.weight || 0.5,
+        specialInstructions: opts.notes || undefined,
+        items: shipmentItems.map((si) => {
+          const oi = orderItemMap.get(si.orderItemId);
+          return {
+            orderItemId: si.orderItemId,
+            name: oi?.productName || "Item",
+            quantity: si.quantity,
+            unitPrice: oi?.price ? Number(oi.price) : undefined,
+          };
+        }),
+        metadata: {
+          ...opts.metadata,
+          notes: opts.notes,
+          deliveryFee: opts.deliveryFee !== null ? opts.deliveryFee : undefined,
+          status: opts.status,
+        },
+      };
+
+      // 4. Invoke Provider Adapter (Clean Provider Abstraction)
+      const providerResult = await courierAdapter.createShipment(normalizedRequest);
+
+      // 5. Handle Provider Adapter Failure
+      // If provider is unconfigured, disabled, or rejected, abort transaction cleanly without creating a fake shipment
+      if (!providerResult.success) {
+        throw new AppError(
+          providerResult.errorMessage || `Shipment creation failed with ${courierAdapter.displayName}`,
+          400,
+          providerResult.errorCode || `${courierAdapter.id.toUpperCase()}_FAILED`
+        );
+      }
+
+      // 6. Map Normalized Status
+      let mappedStatus: ShipmentStatus = ShipmentStatus.PROCESSING;
+      if (providerResult.status === "SHIPPED") {
+        mappedStatus = ShipmentStatus.SHIPPED;
+      } else if (providerResult.status === "PENDING") {
+        mappedStatus = ShipmentStatus.PENDING;
+      } else if (providerResult.status === "IN_TRANSIT") {
+        mappedStatus = ShipmentStatus.IN_TRANSIT;
+      } else if (providerResult.status === "DELIVERED") {
+        mappedStatus = ShipmentStatus.DELIVERED;
+      }
+
+      const resolvedDeliveryFee =
+        providerResult.deliveryFee !== undefined && providerResult.deliveryFee !== null
+          ? providerResult.deliveryFee
+          : opts.deliveryFee !== undefined && opts.deliveryFee !== null
+          ? opts.deliveryFee
+          : null;
+
+      // 7. Store Normalized Shipment in DB
       const shipment = await tx.shipment.create({
         data: {
-          orderId,
-          courierId,
-          trackingNumber,
-          status: ShipmentStatus.PENDING,
+          orderId: order.id,
+          courierId: opts.courierId || null,
+          provider: courierAdapter.id,
+          status: mappedStatus,
+          trackingNumber: providerResult.trackingNumber || opts.trackingNumber || null,
+          trackingUrl: providerResult.trackingUrl || null,
+          consignmentId: providerResult.providerShipmentId || null,
+          providerStatus: providerResult.status,
+          deliveryFee: resolvedDeliveryFee !== null ? resolvedDeliveryFee : null,
+          codAmount: codAmount,
+          idempotencyKey: opts.idempotencyKey || null,
+          shippedAt: mappedStatus === ShipmentStatus.SHIPPED ? new Date() : null,
+          providerMetadata: {
+            ...(providerResult.providerMetadata || {}),
+            notes: opts.notes || undefined,
+          },
           items: {
-            create: items.map(i => {
+            create: shipmentItems.map((i) => {
               const orderItem = orderItemMap.get(i.orderItemId)!;
               return {
                 orderItemId: i.orderItemId,
                 warehouseId: orderItem.warehouseId || null,
                 quantity: i.quantity,
               };
-            })
+            }),
           },
           trackingEvents: {
             create: {
               status: TrackingStatus.INFO_RECEIVED,
-              description: "Shipment information received"
-            }
-          }
+              description: `Shipment created via ${courierAdapter.displayName}${
+                providerResult.trackingNumber ? ` (${providerResult.trackingNumber})` : ""
+              }`,
+            },
+          },
         },
         include: {
           items: true,
-          trackingEvents: true
-        }
+          trackingEvents: true,
+          order: { include: { customer: true } },
+          courier: true,
+        },
       });
 
-      if (order.status === "Pending") {
+      // 8. Update Order Status
+      if (order.status === "Pending" || order.status === "PROCESSING") {
+        const newOrderStatus = mappedStatus === ShipmentStatus.SHIPPED ? "Shipped" : "PROCESSING";
         await tx.order.update({
-          where: { id: orderId },
-          data: { status: "PROCESSING" }
+          where: { id: order.id },
+          data: { status: newOrderStatus, updatedAt: new Date() },
         });
       }
 
+      // 9. Append to Order Timeline
       await tx.orderTimeline.create({
         data: {
-          orderId,
-          status: "PROCESSING",
-          action: `Shipment created with tracking number ${trackingNumber || 'N/A'}`
-        }
+          orderId: order.id,
+          status: order.status,
+          action: `Shipment created via ${courierAdapter.displayName}. Tracking: ${
+            shipment.trackingNumber || shipment.consignmentId || "N/A"
+          }`,
+        },
       });
 
       return shipment;

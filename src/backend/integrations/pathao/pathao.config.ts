@@ -8,6 +8,7 @@ export const PathaoConfig = {
   clientSecret: process.env.PATHAO_CLIENT_SECRET || "",
   username: process.env.PATHAO_USERNAME || "",
   password: process.env.PATHAO_PASSWORD || "",
+  webhookSecret: process.env.PATHAO_WEBHOOK_SECRET || "",
 };
 
 export const validatePathaoConfig = () => {

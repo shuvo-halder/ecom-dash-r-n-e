@@ -3,8 +3,45 @@ import { AdminShipmentService } from "../services/shipment.service";
 
 export const createShipment = async (req: any, res: Response, next: NextFunction) => {
   try {
-    const { orderId, courierId, trackingNumber, items } = req.body;
-    const shipment = await AdminShipmentService.createShipment(orderId, courierId, trackingNumber, items);
+    const {
+      orderId,
+      courierId,
+      trackingNumber,
+      items,
+      provider,
+      deliveryFee,
+      notes,
+      idempotencyKey,
+      recipientName,
+      recipientPhone,
+      recipientAddress,
+      codAmount,
+      weight,
+      status,
+      metadata,
+    } = req.body;
+
+    const resolvedIdempotencyKey =
+      idempotencyKey || (req.headers["idempotency-key"] as string | undefined);
+
+    const shipment = await AdminShipmentService.createShipment({
+      orderId,
+      courierId,
+      trackingNumber,
+      items,
+      provider,
+      deliveryFee: deliveryFee !== undefined && deliveryFee !== null ? Number(deliveryFee) : undefined,
+      notes,
+      idempotencyKey: resolvedIdempotencyKey,
+      recipientName,
+      recipientPhone,
+      recipientAddress,
+      codAmount: codAmount !== undefined && codAmount !== null ? Number(codAmount) : undefined,
+      weight: weight !== undefined && weight !== null ? Number(weight) : undefined,
+      status,
+      metadata,
+    });
+
     res.status(201).json({ status: "success", data: { shipment } });
   } catch (error) {
     next(error);

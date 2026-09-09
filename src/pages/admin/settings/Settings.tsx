@@ -12,6 +12,7 @@ import { MediaUploaderInput } from "../../../components/admin/MediaUploaderInput
 import { notify } from "../../../lib/notify";
 
 import { PermissionGuard } from "../../../components/layout/PermissionGuard";
+import { CourierProvidersSection } from "../../../components/admin/settings/CourierProvidersSection";
 
 const TABS = [
   { id: "Branding", label: "Branding", icon: Palette },
@@ -622,6 +623,9 @@ export function Settings() {
                         </label>
                       </div>
                     </div>
+
+                    {/* Courier Providers Management Section */}
+                    <CourierProvidersSection />
                   </div>
                 )}
 

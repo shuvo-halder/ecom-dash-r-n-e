@@ -22,6 +22,10 @@ export const requireAuth = async (
   next: NextFunction
 ) => {
   try {
+    if (req.user) {
+      return next();
+    }
+
     let token: string | undefined;
     if (
       req.headers.authorization &&

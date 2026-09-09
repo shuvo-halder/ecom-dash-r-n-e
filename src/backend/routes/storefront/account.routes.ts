@@ -26,6 +26,7 @@ import { getMyRefunds, getOrderRefunds } from "../../controllers/storefront/refu
 import { getMyReturns, getOrderReturns } from "../../controllers/storefront/return.controller";
 import {
   getMyShipments,
+  getShipmentById,
   getOrderShipments,
   getOrderTracking,
 } from "../../controllers/storefront/shipment.controller";
@@ -100,6 +101,7 @@ router.get("/payments", getMyPayments);
 router.get("/refunds", getMyRefunds);
 router.get("/returns", getMyReturns);
 router.get("/shipments", getMyShipments);
+router.get("/shipments/:shipmentId", validateParamsUUID(["shipmentId"]), getShipmentById);
 
 // Customer Reviews & Eligibility
 router.get("/reviews", getMyReviews);

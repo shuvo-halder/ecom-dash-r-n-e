@@ -50,6 +50,7 @@ import { MediaController } from "./src/backend/controllers/media.controller";
 import { requireAuth, requirePermission } from "./src/backend/middlewares/auth";
 import faqRouter from "./src/backend/routes/faq.routes";
 import settingRouter from "./src/backend/routes/setting.routes";
+import courierRouter from "./src/backend/routes/courier.routes";
 import seoRouter from "./src/backend/routes/seo.routes";
 
 import storefrontProductRouter from "./src/backend/routes/storefront/product.routes";
@@ -91,6 +92,7 @@ import { globalLimiter } from "./src/backend/middlewares/rateLimiter";
 import { sanitizeMiddleware } from "./src/backend/middlewares/validation";
 import { startRefreshTokenCleanupJob } from "./src/backend/controllers/auth.controller";
 import { UploadCleanupService } from "./src/backend/services/upload-cleanup.service";
+import { PathaoStatusSyncService } from "./src/backend/integrations/pathao/pathao-sync.service";
 
 import { ProductMediaService } from "./src/backend/services/product-media.service";
 
@@ -101,9 +103,10 @@ async function startServer() {
   // Enable trust proxy for reverse proxies (Apache HTTP Server, Next.js, PM2)
   app.set("trust proxy", process.env.TRUST_PROXY || ["loopback", "linklocal", "uniquelocal"]);
 
-  // Start automatic refresh token cleanup job (Part 7)
+  // Start automatic background jobs
   startRefreshTokenCleanupJob();
   UploadCleanupService.startCleanupJob();
+  PathaoStatusSyncService.startPollingJob();
 
   // Part 1 & 10 - Enterprise-grade Helmet security headers config
   app.use(helmet({
@@ -224,6 +227,7 @@ async function startServer() {
   apiRouter.use("/sessions", sessionRouter);
   apiRouter.use("/orders", orderRouter);
   apiRouter.use("/shipments", shipmentRouter);
+  apiRouter.use("/courier", courierRouter);
   apiRouter.use("/pathao", pathaoRouter);
   apiRouter.use("/returns", returnRouter);
   apiRouter.use("/refunds", refundRouter);

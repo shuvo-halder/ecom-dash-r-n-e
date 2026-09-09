@@ -5,6 +5,7 @@ import {
   getMyOrderTimeline,
   getMyOrderShipments,
   getMyOrderTracking,
+  trackGuestOrder,
   claimGuestOrders,
 } from "../../controllers/storefront/order.controller";
 import { getOrderPayments } from "../../controllers/storefront/payment.controller";
@@ -14,6 +15,10 @@ import { requireCustomerAuth } from "../../middlewares/customerAuth";
 import { validateParamsUUID } from "../../middlewares/validation";
 
 const router = express.Router();
+
+// Guest order tracking (secured via matching phone/email check)
+router.post("/track", trackGuestOrder);
+router.get("/track", trackGuestOrder);
 
 router.use(requireCustomerAuth);
 
