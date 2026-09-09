@@ -1144,6 +1144,7 @@ enum ShipmentStatus {
   DELIVERED
   FAILED_DELIVERY
   RETURNED
+  CANCELLED
 }
 
 enum TrackingStatus {
@@ -1185,6 +1186,21 @@ model Shipment {
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 
+  // Pathao & Provider specific fields
+  provider         String?
+  merchantOrderId  String?
+  consignmentId    String?
+  providerStatus   String?
+  providerStoreId  Int?
+  trackingUrl      String?
+  codAmount        Decimal?
+  deliveryFee      Decimal?
+  providerMetadata Json?
+  providerError    String?
+  syncMetadata     Json?
+  lastSyncAt       DateTime?
+  idempotencyKey   String?   @unique
+
   order          Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
   courier        Courier?        @relation(fields: [courierId], references: [id])
   items          ShipmentItem[]
@@ -1194,6 +1210,10 @@ model Shipment {
   @@index([orderId])
   @@index([courierId])
   @@index([status, createdAt])
+  @@index([status])
+  @@index([provider])
+  @@index([consignmentId])
+  @@index([merchantOrderId])
 }
 
 model ShipmentItem {
