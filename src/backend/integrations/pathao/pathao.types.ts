@@ -44,3 +44,30 @@ export interface PathaoResponse<T> {
   data: T;
   code: number;
 }
+
+export interface PathaoDeliveryRequest {
+  store_id: number;
+  merchant_order_id: string;
+  sender_name?: string;
+  sender_phone?: string;
+  recipient_name: string;
+  recipient_phone: string;
+  recipient_address: string;
+  recipient_city: number;
+  recipient_zone: number;
+  recipient_area: number;
+  delivery_type: number; // 48 for normal, 12 for express
+  item_type: number; // 1 for document, 2 for parcel
+  special_instruction?: string;
+  item_quantity: number;
+  item_weight: number;
+  amount_to_collect: number; // COD amount
+  item_description?: string;
+}
+
+export interface PathaoDeliveryResponse {
+  consignment_id: string;
+  merchant_order_id: string;
+  order_status: string;
+  delivery_fee: number;
+}

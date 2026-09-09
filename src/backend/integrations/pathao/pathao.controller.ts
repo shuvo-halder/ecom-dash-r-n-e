@@ -44,3 +44,47 @@ export const getPathaoStores = async (req: any, res: Response, next: NextFunctio
     next(error);
   }
 };
+
+import { PathaoDeliveryService } from "./pathao-delivery.service";
+
+export const createPathaoDelivery = async (req: any, res: Response, next: NextFunction) => {
+  try {
+    const { orderId } = req.params;
+    const {
+      store_id,
+      recipient_city,
+      recipient_zone,
+      recipient_area,
+      recipient_address,
+      recipient_name,
+      recipient_phone,
+      cod_amount,
+      item_weight,
+      special_instruction,
+    } = req.body;
+
+    if (!store_id || !recipient_city || !recipient_zone || !recipient_area || !recipient_address) {
+      return res.status(400).json({
+        status: "error",
+        message: "Missing required delivery fields (store_id, recipient_city, recipient_zone, recipient_area, recipient_address)",
+      });
+    }
+
+    const shipment = await PathaoDeliveryService.createDelivery(orderId, {
+      store_id: Number(store_id),
+      recipient_city: Number(recipient_city),
+      recipient_zone: Number(recipient_zone),
+      recipient_area: Number(recipient_area),
+      recipient_address,
+      recipient_name,
+      recipient_phone,
+      cod_amount: cod_amount !== undefined ? Number(cod_amount) : undefined,
+      item_weight: item_weight ? Number(item_weight) : undefined,
+      special_instruction,
+    });
+
+    res.status(201).json({ status: "success", data: { shipment } });
+  } catch (error) {
+    next(error);
+  }
+};
