@@ -29,6 +29,7 @@ import permissionRouter from "./src/backend/routes/permission.routes";
 import auditRouter from "./src/backend/routes/audit.routes";
 import sessionRouter from "./src/backend/routes/session.routes";
 import shipmentRouter from "./src/backend/routes/shipment.routes";
+import pathaoRouter from "./src/backend/routes/pathao.routes";
 import returnRouter from "./src/backend/routes/return.routes";
 import refundRouter from "./src/backend/routes/refund.routes";
 import paymentRouter from "./src/backend/routes/payment.routes";
@@ -223,6 +224,7 @@ async function startServer() {
   apiRouter.use("/sessions", sessionRouter);
   apiRouter.use("/orders", orderRouter);
   apiRouter.use("/shipments", shipmentRouter);
+  apiRouter.use("/pathao", pathaoRouter);
   apiRouter.use("/returns", returnRouter);
   apiRouter.use("/refunds", refundRouter);
   apiRouter.use("/payments", paymentRouter);
