@@ -39,7 +39,7 @@ export class PathaoDeliveryService {
     // 1. Fetch Order and validate existence
     const order = await prisma.order.findUnique({
       where: { id: orderId },
-      include: { customer: true, items: true, shipments: true },
+      include: { customer: true, items: true, shipments: true, payments: true },
     });
 
     if (!order) {
@@ -122,15 +122,31 @@ export class PathaoDeliveryService {
 
     // 8. Validate COD Amount against Order Total & Payment Status
     let amountToCollect = 0;
+    const isPaid = order.paymentStatus?.toLowerCase() === "paid";
     const orderTotal = Number(order.totalAmount);
 
-    if (order.paymentStatus === "Paid") {
+    let calculatedDueAmount = 0;
+    if (!isPaid) {
+      let totalPaid = 0;
+      if (order.payments && Array.isArray(order.payments)) {
+        totalPaid = order.payments
+          .filter((p: any) => p.status === "PAID" || p.status === "COMPLETED")
+          .reduce(
+            (sum: number, p: any) =>
+              sum + (Number(p.amount || 0) - Number(p.refundedAmount || 0)),
+            0
+          );
+      }
+      calculatedDueAmount = Math.max(0, orderTotal - totalPaid);
+    }
+
+    if (isPaid) {
       if (params.cod_amount !== undefined && Number(params.cod_amount) > 0) {
         throw new AppError("Cannot collect COD on an already paid order", 400, "INVALID_COD_AMOUNT");
       }
       amountToCollect = 0;
     } else {
-      if (params.cod_amount !== undefined) {
+      if (params.cod_amount !== undefined && params.cod_amount !== null) {
         const customCod = Number(params.cod_amount);
         if (isNaN(customCod) || customCod < 0) {
           throw new AppError("COD amount cannot be negative", 400, "INVALID_COD_AMOUNT");
@@ -140,7 +156,7 @@ export class PathaoDeliveryService {
         }
         amountToCollect = customCod;
       } else {
-        amountToCollect = orderTotal;
+        amountToCollect = calculatedDueAmount;
       }
     }
 

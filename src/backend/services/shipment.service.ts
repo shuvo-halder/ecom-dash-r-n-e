@@ -102,6 +102,7 @@ export class AdminShipmentService {
         include: {
           customer: true,
           items: { include: { product: true } },
+          payments: true,
           shipments: {
             where: { deletedAt: null },
             include: { items: true },
@@ -244,13 +245,30 @@ export class AdminShipmentService {
       const recipientPhone = opts.recipientPhone || order.customer?.phone || "";
       const recipientAddress = opts.recipientAddress || order.shippingAddress || "";
 
+      // Calculate authoritative due/collectable amount from existing Order financials
       const isPaid = order.paymentStatus?.toLowerCase() === "paid";
+      let calculatedDueAmount = 0;
+      if (!isPaid) {
+        let totalPaid = 0;
+        if (order.payments && Array.isArray(order.payments)) {
+          totalPaid = order.payments
+            .filter((p: any) => p.status === "PAID" || p.status === "COMPLETED")
+            .reduce(
+              (sum: number, p: any) =>
+                sum + (Number(p.amount || 0) - Number(p.refundedAmount || 0)),
+              0
+            );
+        }
+        calculatedDueAmount = Math.max(0, Number(order.totalAmount || 0) - totalPaid);
+      }
+
+      // Customer collectable amount flows directly from the authoritative Order due amount
       const codAmount =
         opts.codAmount !== undefined && opts.codAmount !== null
           ? opts.codAmount
           : isPaid
           ? 0
-          : Number(order.totalAmount || 0);
+          : calculatedDueAmount;
 
       const totalQty = shipmentItems.reduce((acc, it) => acc + it.quantity, 0);
 

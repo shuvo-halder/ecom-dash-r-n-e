@@ -75,14 +75,36 @@ export function CreateShipmentModal({
 
   if (!isOpen || !order) return null;
 
-  // Derive recipient details
+  // Derive recipient details & authoritative financial breakdown
   const customerName = order.customer
     ? `${order.customer.firstName || ""} ${order.customer.lastName || ""}`.trim() || order.customer.email
     : "Guest Customer";
   const customerPhone = order.customer?.phone || "N/A";
   const shippingAddress = order.shippingAddress || "Standard Delivery Address";
+
+  const subtotal =
+    order.subtotal !== undefined && order.subtotal !== null
+      ? Number(order.subtotal)
+      : Array.isArray(order.items)
+      ? order.items.reduce((sum: number, it: any) => sum + (it.quantity || 1) * Number(it.price || 0), 0)
+      : Number(order.totalAmount || 0);
+
+  const shippingFee = Number(order.shippingFee ?? order.shippingCost ?? 0);
+  const discountAmount = Number(order.discountAmount ?? 0);
+  const taxAmount = Number(order.taxAmount ?? 0);
+  const totalAmount = Number(order.totalAmount || 0);
+
   const isPaid = order.paymentStatus?.toLowerCase() === "paid";
-  const codAmount = isPaid ? 0 : Number(order.totalAmount || 0);
+  const paidAmount = isPaid
+    ? totalAmount
+    : Array.isArray(order.payments)
+    ? order.payments
+        .filter((p: any) => p.status === "PAID" || p.status === "COMPLETED")
+        .reduce((sum: number, p: any) => sum + (Number(p.amount || 0) - Number(p.refundedAmount || 0)), 0)
+    : 0;
+
+  const dueAmount = isPaid ? 0 : Math.max(0, totalAmount - paidAmount);
+  const codAmount = dueAmount;
 
   // Item toggle / quantity helpers
   const handleQuantityChange = (itemId: string, qty: number, maxQty: number) => {
@@ -459,24 +481,85 @@ export function CreateShipmentModal({
             </div>
           </div>
 
-          {/* STEP 4: Recipient & COD Overview */}
-          <div className="p-3.5 rounded-lg bg-muted/30 border border-border space-y-2 text-xs">
-            <div className="font-medium text-foreground flex items-center justify-between">
-              <span className="flex items-center gap-1.5">
-                <User className="h-3.5 w-3.5 text-muted-foreground" />
-                {customerName}
+          {/* STEP 4: Recipient & Authoritative Order Financials */}
+          <div className="space-y-3 pt-2 border-t border-border">
+            <h3 className="text-sm font-semibold flex items-center justify-between">
+              <span>Financial & Recipient Summary</span>
+              <span className="text-[11px] font-normal text-muted-foreground">
+                Derived from Order #{order.orderNumber}
               </span>
-              <span className="font-semibold text-primary">
-                COD: ৳{codAmount.toLocaleString()} {isPaid && "(Paid)"}
-              </span>
+            </h3>
+
+            {/* Financial Breakdown Card */}
+            <div className="p-3.5 rounded-lg bg-muted/40 border border-border/80 space-y-2 text-xs">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pb-2 border-b border-border/60">
+                <div>
+                  <span className="text-muted-foreground block text-[11px]">Product Subtotal</span>
+                  <span className="font-semibold text-foreground">৳{subtotal.toFixed(2)}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground block text-[11px]">Shipping Charge</span>
+                  <span className="font-semibold text-foreground">৳{shippingFee.toFixed(2)}</span>
+                </div>
+                {discountAmount > 0 && (
+                  <div>
+                    <span className="text-muted-foreground block text-[11px]">Discount</span>
+                    <span className="font-semibold text-emerald-600">-৳{discountAmount.toFixed(2)}</span>
+                  </div>
+                )}
+                <div>
+                  <span className="text-muted-foreground block text-[11px]">Customer Total</span>
+                  <span className="font-bold text-foreground">৳{totalAmount.toFixed(2)}</span>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground">Payment:</span>
+                  <Badge
+                    variant="outline"
+                    className={`text-[10px] ${
+                      isPaid
+                        ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
+                        : "bg-amber-500/10 text-amber-600 border-amber-500/20"
+                    }`}
+                  >
+                    {order.paymentStatus || "Unpaid"}
+                  </Badge>
+                </div>
+
+                <div className="text-right">
+                  <span className="text-muted-foreground mr-2 text-[11px]">
+                    {provider === "pathao" ? "Pathao Collectable Amount:" : "Courier COD Amount:"}
+                  </span>
+                  <span className="font-mono font-bold text-sm text-primary">
+                    ৳{codAmount.toFixed(2)}
+                  </span>
+                </div>
+              </div>
+
+              <p className="text-[11px] text-muted-foreground pt-1 border-t border-border/40 flex items-center gap-1.5">
+                <Check className="h-3 w-3 text-emerald-600 shrink-0" />
+                Customer shipping charge is automatically included in the collectable amount. No manual amount entry needed.
+              </p>
             </div>
-            <div className="text-muted-foreground flex items-center gap-2">
-              <Phone className="h-3.5 w-3.5 shrink-0" />
-              <span>{customerPhone}</span>
-            </div>
-            <div className="text-muted-foreground flex items-center gap-2">
-              <MapPin className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate">{shippingAddress}</span>
+
+            {/* Recipient Card */}
+            <div className="p-3 rounded-lg bg-muted/20 border border-border/60 space-y-1.5 text-xs">
+              <div className="font-medium text-foreground flex items-center justify-between">
+                <span className="flex items-center gap-1.5 font-semibold">
+                  <User className="h-3.5 w-3.5 text-muted-foreground" />
+                  {customerName}
+                </span>
+                <span className="text-muted-foreground flex items-center gap-1.5">
+                  <Phone className="h-3.5 w-3.5" />
+                  {customerPhone}
+                </span>
+              </div>
+              <div className="text-muted-foreground flex items-center gap-1.5 pt-0.5">
+                <MapPin className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">{shippingAddress}</span>
+              </div>
             </div>
           </div>
 

@@ -130,6 +130,12 @@ export const getOrderById = async (req: AuthRequest, res: Response, next: NextFu
           orderBy: { createdAt: "desc" },
         },
         coupon: true,
+        payments: {
+          orderBy: { createdAt: "desc" },
+        },
+        refunds: {
+          orderBy: { createdAt: "desc" },
+        },
       },
     });
 

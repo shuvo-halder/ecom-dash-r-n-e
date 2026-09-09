@@ -244,16 +244,72 @@ export function OrderDetail() {
               </table>
             </div>
 
-            <div className="border-t pt-3 space-y-1 text-sm text-right">
-              <div className="flex justify-end gap-6 text-muted-foreground">
-                <span>Subtotal:</span>
-                <span className="font-medium text-foreground">৳{Number(order.totalAmount || 0).toFixed(2)}</span>
-              </div>
-              <div className="flex justify-end gap-6 font-bold text-base text-foreground pt-2 border-t">
-                <span>Total Amount:</span>
-                <span className="text-primary">৳{Number(order.totalAmount || 0).toFixed(2)}</span>
-              </div>
-            </div>
+            {/* Financial Breakdown */}
+            {(() => {
+              const subtotal =
+                order.subtotal !== undefined && order.subtotal !== null
+                  ? Number(order.subtotal)
+                  : Array.isArray(order.items)
+                  ? order.items.reduce((sum: number, it: any) => sum + (it.quantity || 1) * Number(it.price || 0), 0)
+                  : Number(order.totalAmount || 0);
+
+              const shippingFee = Number(order.shippingFee ?? order.shippingCost ?? 0);
+              const discountAmount = Number(order.discountAmount ?? 0);
+              const taxAmount = Number(order.taxAmount ?? 0);
+              const totalAmount = Number(order.totalAmount || 0);
+
+              const isPaid = order.paymentStatus?.toLowerCase() === "paid";
+              const paidAmount = isPaid
+                ? totalAmount
+                : Array.isArray(order.payments)
+                ? order.payments
+                    .filter((p: any) => p.status === "PAID" || p.status === "COMPLETED")
+                    .reduce((sum: number, p: any) => sum + (Number(p.amount || 0) - Number(p.refundedAmount || 0)), 0)
+                : 0;
+
+              const dueAmount = isPaid ? 0 : Math.max(0, totalAmount - paidAmount);
+
+              return (
+                <div className="border-t pt-4 space-y-2 text-sm">
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>Product Subtotal:</span>
+                    <span className="font-medium text-foreground">৳{subtotal.toFixed(2)}</span>
+                  </div>
+                  {discountAmount > 0 && (
+                    <div className="flex justify-between text-emerald-600">
+                      <span>Discount {order.coupon?.code ? `(${order.coupon.code})` : ""}:</span>
+                      <span className="font-medium">-৳{discountAmount.toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>Shipping Charge:</span>
+                    <span className="font-medium text-foreground">৳{shippingFee.toFixed(2)}</span>
+                  </div>
+                  {taxAmount > 0 && (
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>Tax / VAT:</span>
+                      <span className="font-medium text-foreground">+৳{taxAmount.toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between font-bold text-base text-foreground pt-2 border-t">
+                    <span>Grand Total:</span>
+                    <span className="text-primary">৳{totalAmount.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs pt-1">
+                    <span className="text-muted-foreground">Payment Status:</span>
+                    <span className={`font-semibold ${isPaid ? "text-emerald-600" : "text-amber-600"}`}>
+                      {order.paymentStatus || "Unpaid"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between font-semibold text-sm pt-1 border-t border-dashed">
+                    <span className="text-muted-foreground">Collectable / Due (COD):</span>
+                    <span className={dueAmount > 0 ? "text-foreground font-bold" : "text-muted-foreground"}>
+                      ৳{dueAmount.toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
 
           {/* Timeline Section */}
