@@ -320,6 +320,124 @@ export class PathaoDeliveryService {
     logger.info(`[PathaoDeliveryService] Successfully created consignment ${consignmentId} for order ${orderId}`);
     return updatedShipment;
   }
+
+  /**
+   * Refreshes consignment status from Pathao and updates the shipment record.
+   */
+  public static async refreshStatus(shipmentId: string): Promise<Shipment> {
+    const shipment = await prisma.shipment.findUnique({
+      where: { id: shipmentId },
+    });
+
+    if (!shipment) {
+      throw new AppError("Shipment not found", 404, "SHIPMENT_NOT_FOUND");
+    }
+
+    if (shipment.provider !== "pathao" || !shipment.consignmentId) {
+      throw new AppError("Shipment is not an active Pathao consignment", 400, "INVALID_PROVIDER");
+    }
+
+    try {
+      const response = await pathaoClient.getHttp().get<PathaoResponse<any>>(
+        `/aladdin/api/v1/orders/${shipment.consignmentId}/info`
+      );
+
+      const info = response.data?.data;
+      const orderStatus = info?.order_status || info?.order_status_slug || shipment.providerStatus;
+
+      let internalStatus = shipment.status;
+      const normalized = (orderStatus || "").toLowerCase();
+      if (normalized.includes("delivered")) {
+        internalStatus = ShipmentStatus.DELIVERED;
+      } else if (normalized.includes("cancel")) {
+        internalStatus = ShipmentStatus.CANCELLED;
+      } else if (normalized.includes("return")) {
+        internalStatus = ShipmentStatus.RETURNED;
+      } else if (
+        normalized.includes("in transit") ||
+        normalized.includes("picked") ||
+        normalized.includes("shipped")
+      ) {
+        internalStatus = ShipmentStatus.SHIPPED;
+      }
+
+      const updated = await prisma.shipment.update({
+        where: { id: shipmentId },
+        data: {
+          providerStatus: orderStatus,
+          status: internalStatus,
+          lastSyncAt: new Date(),
+          syncMetadata: response.data ? JSON.parse(JSON.stringify(response.data)) : undefined,
+          ...(internalStatus === ShipmentStatus.DELIVERED && !shipment.deliveredAt
+            ? { deliveredAt: new Date() }
+            : {}),
+          ...(internalStatus === ShipmentStatus.SHIPPED && !shipment.shippedAt
+            ? { shippedAt: new Date() }
+            : {}),
+        },
+      });
+
+      return updated;
+    } catch (error: any) {
+      logger.warn(`[PathaoDeliveryService] Error refreshing status for ${shipment.consignmentId}`, {
+        error: error.response?.data || error.message,
+      });
+
+      const updated = await prisma.shipment.update({
+        where: { id: shipmentId },
+        data: { lastSyncAt: new Date() },
+      });
+      return updated;
+    }
+  }
+
+  /**
+   * Cancels a Pathao shipment if eligible.
+   */
+  public static async cancelDelivery(shipmentId: string, reason?: string): Promise<Shipment> {
+    const shipment = await prisma.shipment.findUnique({
+      where: { id: shipmentId },
+    });
+
+    if (!shipment) {
+      throw new AppError("Shipment not found", 404, "SHIPMENT_NOT_FOUND");
+    }
+
+    if (shipment.provider !== "pathao") {
+      throw new AppError("Shipment is not a Pathao shipment", 400, "INVALID_PROVIDER");
+    }
+
+    if (shipment.status === ShipmentStatus.CANCELLED) {
+      throw new AppError("Shipment is already cancelled", 400, "ALREADY_CANCELLED");
+    }
+
+    if (shipment.status === ShipmentStatus.DELIVERED) {
+      throw new AppError("Cannot cancel a delivered shipment", 400, "CANNOT_CANCEL_DELIVERED");
+    }
+
+    if (shipment.consignmentId) {
+      try {
+        await pathaoClient.getHttp().post(`/aladdin/api/v1/orders/${shipment.consignmentId}/cancel`, {
+          reason: reason || "Cancelled by admin",
+        });
+      } catch (err: any) {
+        logger.warn(`[PathaoDeliveryService] Pathao remote cancel reported warning`, {
+          error: err.response?.data || err.message,
+        });
+      }
+    }
+
+    const updated = await prisma.shipment.update({
+      where: { id: shipmentId },
+      data: {
+        status: ShipmentStatus.CANCELLED,
+        providerStatus: "Cancelled",
+        lastSyncAt: new Date(),
+      },
+    });
+
+    return updated;
+  }
 }
 
 // Export alias for PathaoShipmentService

@@ -115,6 +115,14 @@ export const getOrderById = async (req: AuthRequest, res: Response, next: NextFu
             productVariant: true,
           },
         },
+        shipments: {
+          orderBy: { createdAt: "desc" },
+          include: {
+            trackingEvents: {
+              orderBy: { timestamp: "desc" },
+            },
+          },
+        },
         timeline: {
           orderBy: { createdAt: "asc" },
         },

@@ -1,5 +1,7 @@
 import { Response, NextFunction } from "express";
 import { PathaoLocationService } from "./pathao.service";
+import { PathaoDeliveryService } from "./pathao-delivery.service";
+import { prisma } from "../../config/db";
 
 export const getPathaoCities = async (req: any, res: Response, next: NextFunction) => {
   try {
@@ -45,8 +47,6 @@ export const getPathaoStores = async (req: any, res: Response, next: NextFunctio
   }
 };
 
-import { PathaoDeliveryService } from "./pathao-delivery.service";
-
 export const createPathaoDelivery = async (req: any, res: Response, next: NextFunction) => {
   try {
     const { orderId } = req.params;
@@ -84,6 +84,60 @@ export const createPathaoDelivery = async (req: any, res: Response, next: NextFu
     });
 
     res.status(201).json({ status: "success", data: { shipment } });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const refreshPathaoShipment = async (req: any, res: Response, next: NextFunction) => {
+  try {
+    const { shipmentId } = req.params;
+    const shipment = await PathaoDeliveryService.refreshStatus(shipmentId);
+    res.status(200).json({ status: "success", data: { shipment } });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const cancelPathaoShipment = async (req: any, res: Response, next: NextFunction) => {
+  try {
+    const { shipmentId } = req.params;
+    const { reason } = req.body;
+    const shipment = await PathaoDeliveryService.cancelDelivery(shipmentId, reason);
+    res.status(200).json({ status: "success", data: { shipment } });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getPathaoShipment = async (req: any, res: Response, next: NextFunction) => {
+  try {
+    const { shipmentId } = req.params;
+    const shipment = await prisma.shipment.findUnique({
+      where: { id: shipmentId },
+      include: {
+        order: {
+          select: {
+            id: true,
+            orderNumber: true,
+            status: true,
+            paymentStatus: true,
+            totalAmount: true,
+            customer: true,
+            shippingAddress: true,
+          },
+        },
+        trackingEvents: {
+          orderBy: { timestamp: "desc" },
+        },
+      },
+    });
+
+    if (!shipment) {
+      return res.status(404).json({ status: "error", message: "Shipment not found" });
+    }
+
+    res.status(200).json({ status: "success", data: { shipment } });
   } catch (error) {
     next(error);
   }

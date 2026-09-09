@@ -4,7 +4,10 @@ import {
   getPathaoZones,
   getPathaoAreas,
   getPathaoStores,
-  createPathaoDelivery
+  createPathaoDelivery,
+  refreshPathaoShipment,
+  cancelPathaoShipment,
+  getPathaoShipment,
 } from "../integrations/pathao/pathao.controller";
 import { requireAuth, requirePermission } from "../middlewares/auth";
 
@@ -21,5 +24,10 @@ router.get("/stores", getPathaoStores);
 
 // Requires write permission for order dispatch
 router.post("/orders/:orderId/ship", requirePermission("Orders", "write"), createPathaoDelivery);
+
+// Shipment management endpoints
+router.get("/shipments/:shipmentId", getPathaoShipment);
+router.post("/shipments/:shipmentId/refresh", requirePermission("Orders", "write"), refreshPathaoShipment);
+router.post("/shipments/:shipmentId/cancel", requirePermission("Orders", "write"), cancelPathaoShipment);
 
 export default router;

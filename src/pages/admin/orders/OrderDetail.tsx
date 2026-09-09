@@ -29,6 +29,7 @@ import { Button } from "../../../components/ui/button";
 import { Input } from "../../../components/ui/input";
 import { useAuth } from "../../../context/AuthContext";
 import { notify } from "../../../lib/notify";
+import { PathaoShipmentCard } from "../../../components/admin/orders/PathaoShipmentCard";
 
 export function OrderDetail() {
   const { id } = useParams<{ id: string }>();
@@ -371,6 +372,13 @@ export function OrderDetail() {
               )}
             </form>
           </div>
+
+          {/* Pathao Courier Dispatch & Shipment Management */}
+          <PathaoShipmentCard
+            order={order}
+            onOrderUpdated={fetchOrderDetails}
+            canManage={hasPermission("Orders", "write")}
+          />
 
           {/* Assign Staff */}
           <div className="bg-card border rounded-lg p-5 space-y-3 shadow-xs">
