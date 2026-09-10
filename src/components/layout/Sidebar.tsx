@@ -240,7 +240,7 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
         icon: Settings,
         items: [
           { label: 'Notifications', href: '/admin/notifications', module: 'Notifications', requiredPermission: 'Notifications.read', icon: Bell },
-          { label: 'Archive', href: '/admin/archive', module: 'Archive', requiredPermission: 'Archive.read', icon: Archive },
+          { label: 'Archive', href: '/admin/archive', module: 'Settings', requiredPermission: 'Settings.read', icon: Archive },
           { label: 'Settings', href: '/settings', module: 'Settings', requiredPermission: 'Settings.read', icon: Settings },
           { label: 'SEO Settings', href: '/admin/seo', module: 'SEO', requiredPermission: 'SEO.read', icon: Search },
           { label: 'Security & Auth', href: '/settings', module: 'Settings', requiredPermission: 'Settings.read', icon: Shield }
