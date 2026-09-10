@@ -11,6 +11,8 @@ import { Plus, MoreHorizontal, Edit, Trash2 } from 'lucide-react';
 import { getProductVariants, deleteVariant, createProductVariant, updateVariant } from '../../services/variant.service';
 import { getAttributes } from '../../services/attribute.service';
 import { api } from '../../lib/api';
+import { ConfirmDialog } from '../../components/common/ConfirmDialog';
+import { notify } from '../../lib/notify';
 
 interface ProductVariantsProps {
   productId: string;
@@ -20,6 +22,7 @@ export function ProductVariants({ productId }: ProductVariantsProps) {
   const queryClient = useQueryClient();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingVariant, setEditingVariant] = useState<any>(null);
+  const [variantToDelete, setVariantToDelete] = useState<{ id: string; sku: string } | null>(null);
   
   const [formData, setFormData] = useState({
     sku: '',
@@ -50,8 +53,9 @@ export function ProductVariants({ productId }: ProductVariantsProps) {
       queryClient.invalidateQueries({ queryKey: ['productVariants', productId] });
       setIsFormOpen(false);
       resetForm();
+      notify.success('Variant Created', 'Product variant has been created successfully.');
     },
-    onError: (err: any) => alert(err.response?.data?.error?.message || 'Failed to create variant')
+    onError: (err: any) => notify.apiError(err, 'Failed to create variant.')
   });
 
   const updateMutation = useMutation({
@@ -61,16 +65,19 @@ export function ProductVariants({ productId }: ProductVariantsProps) {
       setIsFormOpen(false);
       setEditingVariant(null);
       resetForm();
+      notify.success('Variant Updated', 'Product variant details have been updated.');
     },
-    onError: (err: any) => alert(err.response?.data?.error?.message || 'Failed to update variant')
+    onError: (err: any) => notify.apiError(err, 'Failed to update variant.')
   });
 
   const deleteMutation = useMutation({
     mutationFn: deleteVariant,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['productVariants', productId] });
+      notify.success('Variant Deleted', `Variant ${variantToDelete?.sku || ''} was deleted.`);
+      setVariantToDelete(null);
     },
-    onError: (err: any) => alert(err.response?.data?.error?.message || 'Failed to delete variant')
+    onError: (err: any) => notify.apiError(err, 'Failed to delete variant.')
   });
 
   const resetForm = () => {
@@ -102,12 +109,6 @@ export function ProductVariants({ productId }: ProductVariantsProps) {
     });
     setSelectedAttributes(variant.attributes?.map((a: any) => a.attributeValueId) || []);
     setIsFormOpen(true);
-  };
-
-  const handleDelete = (id: string) => {
-    if (window.confirm('Are you sure you want to delete this variant?')) {
-      deleteMutation.mutate(id);
-    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -290,10 +291,10 @@ export function ProductVariants({ productId }: ProductVariantsProps) {
                     </div>
                   </TableCell>
                   <TableCell>
-                    ${Number(variant.price).toFixed(2)}
+                    ৳{Number(variant.price).toFixed(2)}
                     {variant.compareAtPrice && (
                       <span className="text-muted-foreground line-through ml-2 text-xs">
-                        ${Number(variant.compareAtPrice).toFixed(2)}
+                        ৳{Number(variant.compareAtPrice).toFixed(2)}
                       </span>
                     )}
                   </TableCell>
@@ -315,7 +316,7 @@ export function ProductVariants({ productId }: ProductVariantsProps) {
                           <Edit className="mr-2 h-4 w-4" /> Edit
                         </DropdownMenuItem>
                         <DropdownMenuItem 
-                          onClick={() => handleDelete(variant.id)}
+                          onClick={() => setVariantToDelete({ id: variant.id, sku: variant.sku })}
                           className="text-destructive focus:bg-destructive focus:text-destructive-foreground"
                         >
                           <Trash2 className="mr-2 h-4 w-4" /> Delete
@@ -329,6 +330,21 @@ export function ProductVariants({ productId }: ProductVariantsProps) {
           </TableBody>
         </Table>
       </CardContent>
+
+      <ConfirmDialog
+        isOpen={!!variantToDelete}
+        onOpenChange={(open) => !open && setVariantToDelete(null)}
+        title="Delete Product Variant"
+        description={
+          <>
+            Are you sure you want to delete variant <strong>{variantToDelete?.sku}</strong>? This will permanently remove its inventory records.
+          </>
+        }
+        confirmText="Delete Variant"
+        variant="destructive"
+        isLoading={deleteMutation.isPending}
+        onConfirm={() => variantToDelete && deleteMutation.mutate(variantToDelete.id)}
+      />
     </Card>
   );
 }

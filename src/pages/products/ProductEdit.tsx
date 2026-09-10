@@ -5,6 +5,7 @@ import { ProductForm } from './ProductForm';
 import { getProductById, updateProduct } from '../../services/product.service';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/src/components/ui/button';
+import { notify } from '@/src/lib/notify';
 
 export function ProductEdit() {
   const { id } = useParams<{ id: string }>();
@@ -19,19 +20,19 @@ export function ProductEdit() {
 
   const mutation = useMutation({
     mutationFn: (data: any) => updateProduct(id!, data),
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['product', id] });
+      notify.success('Product Updated', `Changes to "${data?.name || product?.name || 'Product'}" were saved successfully.`);
       navigate('/products');
     },
     onError: (error) => {
-      console.error('Failed to update product', error);
-      alert('Failed to update product');
+      notify.apiError(error, 'Failed to update product. Please verify the changes.');
     }
   });
 
   if (isLoading) {
-    return <div className="p-8 text-center text-muted-foreground">Loading...</div>;
+    return <div className="p-8 text-center text-muted-foreground">Loading product details...</div>;
   }
 
   if (!product) {
@@ -50,3 +51,4 @@ export function ProductEdit() {
     </div>
   );
 }
+

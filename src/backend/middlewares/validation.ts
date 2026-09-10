@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import { z } from "zod";
 import { AppError } from "../utils/AppError";
 import { AuditService } from "../services/audit.service";
+import { RICH_TEXT_FIELDS, sanitizeRichText } from "../utils/richTextSanitizer";
 
 // Part 12 - Password Policy Schema
 // Minimum: 12 characters, 1 uppercase, 1 lowercase, 1 number, 1 special character
@@ -115,11 +116,16 @@ export const validateParamsUUID = (paramNames: string[]) => {
   };
 };
 
-// Recursive Sanitization function (Part 4)
-function sanitizeValue(value: any): any {
+// Recursive Sanitization function (Part 4 & Rich Text Aware)
+function sanitizeValue(value: any, keyName?: string): any {
   if (value === null || value === undefined) return value;
 
   if (typeof value === "string") {
+    // If field is a recognized rich text field, use server-side rich text sanitizer
+    if (keyName && RICH_TEXT_FIELDS.has(keyName)) {
+      return sanitizeRichText(value);
+    }
+
     let cleaned = value;
 
     // 1. Prototype Pollution protection in strings
@@ -127,9 +133,9 @@ function sanitizeValue(value: any): any {
       cleaned = cleaned.replace(/__proto__|constructor|prototype/g, "");
     }
 
-    // 2. XSS protection: strip HTML and scripts
+    // 2. XSS protection: strip HTML and scripts for standard text fields
     cleaned = cleaned.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "");
-    cleaned = cleaned.replace(/<[^>]*>/g, ""); // Strip general HTML tags
+    cleaned = cleaned.replace(/<[^>]*>/g, ""); // Strip general HTML tags for standard string fields
     cleaned = cleaned.replace(/javascript\s*:/gi, "");
     cleaned = cleaned.replace(/onerror\s*=/gi, "");
     cleaned = cleaned.replace(/onload\s*=/gi, "");
@@ -141,7 +147,7 @@ function sanitizeValue(value: any): any {
   }
 
   if (Array.isArray(value)) {
-    return value.map((item) => sanitizeValue(item));
+    return value.map((item) => sanitizeValue(item, keyName));
   }
 
   if (typeof value === "object") {
@@ -159,7 +165,7 @@ function sanitizeValue(value: any): any {
           sanitizedKey = key.substring(1);
         }
 
-        sanitizedObj[sanitizedKey] = sanitizeValue(value[key]);
+        sanitizedObj[sanitizedKey] = sanitizeValue(value[key], sanitizedKey);
       }
     }
     return sanitizedObj;

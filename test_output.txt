@@ -1,0 +1,528 @@
+
+> react-example@0.0.0 test
+> tsx --test src/backend/__tests__/*.test.ts
+
+TAP version 13
+# ◇ injected env (0) from .env // tip: ⌘ suppress logs { quiet: true }
+# Subtest: Customer Auth & Security Test Suite
+    # Subtest: Phone Normalization for Bangladesh Mobile Numbers
+    ok 1 - Phone Normalization for Bangladesh Mobile Numbers
+      ---
+      duration_ms: 1.083852
+      type: 'test'
+      ...
+    # Subtest: JWT Generation and Verification
+    ok 2 - JWT Generation and Verification
+      ---
+      duration_ms: 6.2279
+      type: 'test'
+      ...
+    # Subtest: Expired JWT surface behavior
+    ok 3 - Expired JWT surface behavior
+      ---
+      duration_ms: 1.156993
+      type: 'test'
+      ...
+    # Subtest: Malformed JWT surface behavior
+    ok 4 - Malformed JWT surface behavior
+      ---
+      duration_ms: 0.393108
+      type: 'test'
+      ...
+    # Subtest: requireCustomerAuth distinguishes expired vs malformed tokens
+    ok 5 - requireCustomerAuth distinguishes expired vs malformed tokens
+      ---
+      duration_ms: 0.986312
+      type: 'test'
+      ...
+    # Subtest: StorefrontAuthService.linkHistoricalGuestOrders handles empty/null inputs safely
+    ok 6 - StorefrontAuthService.linkHistoricalGuestOrders handles empty/null inputs safely
+      ---
+      duration_ms: 0.625792
+      type: 'test'
+      ...
+    1..6
+ok 1 - Customer Auth & Security Test Suite
+  ---
+  duration_ms: 25.92087
+  type: 'test'
+  ...
+# Subtest: Customer Notifications & IDOR Protection Tests
+    # Subtest: GET /customer/notifications: Scoped strictly to authenticated Customer A with unreadCount
+    ok 1 - GET /customer/notifications: Scoped strictly to authenticated Customer A with unreadCount
+      ---
+      duration_ms: 1.208778
+      type: 'test'
+      ...
+    # Subtest: GET /customer/notifications?unreadOnly=true: Returns only unread notifications
+    ok 2 - GET /customer/notifications?unreadOnly=true: Returns only unread notifications
+      ---
+      duration_ms: 0.251572
+      type: 'test'
+      ...
+    # Subtest: PATCH /customer/notifications/:id/read: Customer A marks own notification as read
+    ok 3 - PATCH /customer/notifications/:id/read: Customer A marks own notification as read
+      ---
+      duration_ms: 0.290668
+      type: 'test'
+      ...
+    # Subtest: IDOR Test: Customer B attempting to mark Customer A's notification as read returns 404
+    ok 4 - IDOR Test: Customer B attempting to mark Customer A's notification as read returns 404
+      ---
+      duration_ms: 0.708503
+      type: 'test'
+      ...
+    # Subtest: PATCH /customer/notifications/read-all: Customer A marks all own notifications as read without affecting Customer B
+    ok 5 - PATCH /customer/notifications/read-all: Customer A marks all own notifications as read without affecting Customer B
+      ---
+      duration_ms: 0.670797
+      type: 'test'
+      ...
+    1..5
+ok 2 - Customer Notifications & IDOR Protection Tests
+  ---
+  duration_ms: 5.117551
+  type: 'test'
+  ...
+# Subtest: Customer Orders API & IDOR Protection Tests
+    # Subtest: Customer Order List: Scoped strictly to customer with pagination and search filter
+    ok 1 - Customer Order List: Scoped strictly to customer with pagination and search filter
+      ---
+      duration_ms: 1.263552
+      type: 'test'
+      ...
+    # Subtest: IDOR Protection: Customer A requesting Customer B order ID returns 404 ORDER_NOT_FOUND
+    ok 2 - IDOR Protection: Customer A requesting Customer B order ID returns 404 ORDER_NOT_FOUND
+      ---
+      duration_ms: 0.712442
+      type: 'test'
+      ...
+    # Subtest: IDOR Protection: Customer A requesting Customer B shipments returns 404 ORDER_NOT_FOUND
+    ok 3 - IDOR Protection: Customer A requesting Customer B shipments returns 404 ORDER_NOT_FOUND
+      ---
+      duration_ms: 0.343093
+      type: 'test'
+      ...
+    1..3
+ok 3 - Customer Orders API & IDOR Protection Tests
+  ---
+  duration_ms: 3.973946
+  type: 'test'
+  ...
+# Subtest: Customer Payments, Refunds, Returns API & IDOR Protection Tests
+    # Subtest: Customer Payments List: Scoped strictly to authenticated customer
+    ok 1 - Customer Payments List: Scoped strictly to authenticated customer
+      ---
+      duration_ms: 1.347403
+      type: 'test'
+      ...
+    # Subtest: Order Payments: Valid owner gets order payments & accounting summary
+    not ok 2 - Order Payments: Valid owner gets order payments & accounting summary
+      ---
+      duration_ms: 2.592207
+      type: 'test'
+      location: '/app/applet/src/backend/__tests__/customer-payments-refunds-returns.test.ts:300:11'
+      failureType: 'testCodeFailure'
+      error: |-
+        Expected values to be strictly equal:
+        
+        0 !== 300
+        
+      code: 'ERR_ASSERTION'
+      name: 'AssertionError'
+      expected: 300
+      actual: 0
+      operator: 'strictEqual'
+      stack: |-
+        TestContext.<anonymous> (/app/applet/src/backend/__tests__/customer-payments-refunds-returns.test.ts:305:12)
+        Test.runInAsyncScope (node:async_hooks:214:14)
+        Test.run (node:internal/test_runner/test:1047:25)
+        Test.start (node:internal/test_runner/test:944:17)
+        TestContext.test (node:internal/test_runner/test:373:20)
+        TestContext.<anonymous> (/app/applet/src/backend/__tests__/customer-payments-refunds-returns.test.ts:300:11)
+        async Test.run (node:internal/test_runner/test:1054:7)
+        async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+      ...
+    # Subtest: IDOR Protection: Customer A requesting Customer B order payments throws 404 ORDER_NOT_FOUND
+    ok 3 - IDOR Protection: Customer A requesting Customer B order payments throws 404 ORDER_NOT_FOUND
+      ---
+      duration_ms: 52.463032
+      type: 'test'
+      ...
+    # Subtest: Customer Refunds List: Scoped strictly to authenticated customer
+    ok 4 - Customer Refunds List: Scoped strictly to authenticated customer
+      ---
+      duration_ms: 0.487966
+      type: 'test'
+      ...
+    # Subtest: IDOR Protection: Customer A requesting Customer B order refunds throws 404 ORDER_NOT_FOUND
+    ok 5 - IDOR Protection: Customer A requesting Customer B order refunds throws 404 ORDER_NOT_FOUND
+      ---
+      duration_ms: 0.358304
+      type: 'test'
+      ...
+    # Subtest: Customer Returns List: Scoped strictly to authenticated customer
+    ok 6 - Customer Returns List: Scoped strictly to authenticated customer
+      ---
+      duration_ms: 0.53089
+      type: 'test'
+      ...
+    # Subtest: IDOR Protection: Customer A requesting Customer B order returns throws 404 ORDER_NOT_FOUND
+    ok 7 - IDOR Protection: Customer A requesting Customer B order returns throws 404 ORDER_NOT_FOUND
+      ---
+      duration_ms: 0.443452
+      type: 'test'
+      ...
+    1..7
+not ok 4 - Customer Payments, Refunds, Returns API & IDOR Protection Tests
+  ---
+  duration_ms: 61.890113
+  type: 'test'
+  location: '/app/applet/src/backend/__tests__/customer-payments-refunds-returns.test.ts:5:1'
+  failureType: 'subtestsFailed'
+  error: '1 subtest failed'
+  code: 'ERR_TEST_FAILURE'
+  ...
+# Subtest: Customer Profile API, Validation & Authorization Tests
+    # Subtest: GET /customer/profile: Retrieves authenticated customer's profile with safe fields only
+    ok 1 - GET /customer/profile: Retrieves authenticated customer's profile with safe fields only
+      ---
+      duration_ms: 1.274359
+      type: 'test'
+      ...
+    # Subtest: PATCH /customer/profile: Updates safe customer-editable fields (firstName, lastName, avatarUrl)
+    ok 2 - PATCH /customer/profile: Updates safe customer-editable fields (firstName, lastName, avatarUrl)
+      ---
+      duration_ms: 2.167357
+      type: 'test'
+      ...
+    # Subtest: PATCH /customer/profile: Partial updates (updating only lastName without changing firstName)
+    ok 3 - PATCH /customer/profile: Partial updates (updating only lastName without changing firstName)
+      ---
+      duration_ms: 0.276299
+      type: 'test'
+      ...
+    # Subtest: Security: Direct modification of forbidden fields is rejected by schema or ignored by updater
+    ok 4 - Security: Direct modification of forbidden fields is rejected by schema or ignored by updater
+      ---
+      duration_ms: 0.322655
+      type: 'test'
+      ...
+    # Subtest: Validation: Empty firstName and invalid avatarUrl are rejected by schema
+    ok 5 - Validation: Empty firstName and invalid avatarUrl are rejected by schema
+      ---
+      duration_ms: 1.573727
+      type: 'test'
+      ...
+    # Subtest: Authorization & IDOR: Requesting an unknown customer ID returns 404
+    ok 6 - Authorization & IDOR: Requesting an unknown customer ID returns 404
+      ---
+      duration_ms: 0.318722
+      type: 'test'
+      ...
+    1..6
+ok 5 - Customer Profile API, Validation & Authorization Tests
+  ---
+  duration_ms: 8.647709
+  type: 'test'
+  ...
+# Subtest: Customer Reviews, Review-Eligibility & IDOR Protection Tests
+    # Subtest: GET /customer/reviews/eligible should return all unreviewed delivered items for customer A
+    ok 1 - GET /customer/reviews/eligible should return all unreviewed delivered items for customer A
+      ---
+      duration_ms: 1.274815
+      type: 'test'
+      ...
+    # Subtest: POST /customer/reviews should successfully submit a review for customer A's delivered item
+    ok 2 - POST /customer/reviews should successfully submit a review for customer A's delivered item
+      ---
+      duration_ms: 0.60904
+      type: 'test'
+      ...
+    # Subtest: GET /customer/reviews/eligible should reflect consumed entitlement
+    ok 3 - GET /customer/reviews/eligible should reflect consumed entitlement
+      ---
+      duration_ms: 0.303159
+      type: 'test'
+      ...
+    # Subtest: IDOR Test: Customer B cannot submit review for Customer A's order item
+    ok 4 - IDOR Test: Customer B cannot submit review for Customer A's order item
+      ---
+      duration_ms: 0.953463
+      type: 'test'
+      ...
+    # Subtest: Duplicate Review Test: Submitting a second review on the same order item throws 409
+    ok 5 - Duplicate Review Test: Submitting a second review on the same order item throws 409
+      ---
+      duration_ms: 0.331273
+      type: 'test'
+      ...
+    # Subtest: Non-Delivered Order Test: Submitting a review for a non-delivered order item throws 403
+    ok 6 - Non-Delivered Order Test: Submitting a review for a non-delivered order item throws 403
+      ---
+      duration_ms: 0.296529
+      type: 'test'
+      ...
+    # Subtest: Multiple Purchases Test: Second delivered purchase of same product can be reviewed separately
+    ok 7 - Multiple Purchases Test: Second delivered purchase of same product can be reviewed separately
+      ---
+      duration_ms: 0.263876
+      type: 'test'
+      ...
+    # Subtest: GET /customer/reviews should return all submitted reviews for customer A with pagination
+    ok 8 - GET /customer/reviews should return all submitted reviews for customer A with pagination
+      ---
+      duration_ms: 0.632033
+      type: 'test'
+      ...
+    1..8
+ok 6 - Customer Reviews, Review-Eligibility & IDOR Protection Tests
+  ---
+  duration_ms: 8.467702
+  type: 'test'
+  ...
+# Subtest: Customer Shipments & Tracking API & IDOR Protection Tests
+    # Subtest: Customer Shipments List: Scoped strictly to authenticated customer
+    ok 1 - Customer Shipments List: Scoped strictly to authenticated customer
+      ---
+      duration_ms: 1.245403
+      type: 'test'
+      ...
+    # Subtest: Order Shipments: Valid owner retrieves order shipments
+    ok 2 - Order Shipments: Valid owner retrieves order shipments
+      ---
+      duration_ms: 0.357085
+      type: 'test'
+      ...
+    # Subtest: IDOR Protection: Customer A requesting Customer B order shipments throws 404 ORDER_NOT_FOUND
+    ok 3 - IDOR Protection: Customer A requesting Customer B order shipments throws 404 ORDER_NOT_FOUND
+      ---
+      duration_ms: 0.690148
+      type: 'test'
+      ...
+    # Subtest: Order Tracking: Valid owner retrieves order tracking timeline & carrier info
+    ok 4 - Order Tracking: Valid owner retrieves order tracking timeline & carrier info
+      ---
+      duration_ms: 0.515161
+      type: 'test'
+      ...
+    # Subtest: IDOR Protection: Customer A requesting Customer B order tracking throws 404 ORDER_NOT_FOUND
+    ok 5 - IDOR Protection: Customer A requesting Customer B order tracking throws 404 ORDER_NOT_FOUND
+      ---
+      duration_ms: 0.2994
+      type: 'test'
+      ...
+    1..5
+ok 7 - Customer Shipments & Tracking API & IDOR Protection Tests
+  ---
+  duration_ms: 5.333484
+  type: 'test'
+  ...
+# ◇ injected env (0) from .env // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
+# Subtest: Customer Dashboard API DTO & Aggregation Tests
+    # Subtest: Dashboard aggregates customer, order, financial and engagement metrics correctly
+    ok 1 - Dashboard aggregates customer, order, financial and engagement metrics correctly
+      ---
+      duration_ms: 7.782335
+      type: 'test'
+      ...
+    1..1
+ok 8 - Customer Dashboard API DTO & Aggregation Tests
+  ---
+  duration_ms: 9.041047
+  type: 'test'
+  ...
+# ◇ injected env (0) from .env // tip: ⌘ suppress logs { quiet: true }
+# Subtest: Guest Order Claim & Linking Service Tests
+    # Subtest: A. Guest order is linked for phone-verified customer
+    ok 1 - A. Guest order is linked for phone-verified customer
+      ---
+      duration_ms: 3.607141
+      type: 'test'
+      ...
+    # Subtest: B. Already-owned order is not reassigned
+    ok 2 - B. Already-owned order is not reassigned
+      ---
+      duration_ms: 0.697341
+      type: 'test'
+      ...
+    # Subtest: C. Different phone does not link
+    ok 3 - C. Different phone does not link
+      ---
+      duration_ms: 0.458548
+      type: 'test'
+      ...
+    # Subtest: D. Unverified customer cannot claim orders
+    ok 4 - D. Unverified customer cannot claim orders
+      ---
+      duration_ms: 0.446078
+      type: 'test'
+      ...
+    # Subtest: E. Repeated execution is idempotent
+    ok 5 - E. Repeated execution is idempotent
+      ---
+      duration_ms: 0.964723
+      type: 'test'
+      ...
+    # Subtest: F. Multiple guest orders are linked at once
+    ok 6 - F. Multiple guest orders are linked at once
+      ---
+      duration_ms: 0.778799
+      type: 'test'
+      ...
+    # Subtest: G. Transaction failure rolls back ownership updates safely
+    ok 7 - G. Transaction failure rolls back ownership updates safely
+      ---
+      duration_ms: 0.847237
+      type: 'test'
+      ...
+    # Subtest: H. Mobile Login: Existing customer with matching guest orders
+    ok 8 - H. Mobile Login: Existing customer with matching guest orders
+      ---
+      duration_ms: 0.906955
+      type: 'test'
+      ...
+    # Subtest: I. Mobile Login: Existing customer with NO matching guest orders
+    ok 9 - I. Mobile Login: Existing customer with NO matching guest orders
+      ---
+      duration_ms: 0.751489
+      type: 'test'
+      ...
+    # Subtest: J. Mobile Login: Already claimed order is skipped
+    ok 10 - J. Mobile Login: Already claimed order is skipped
+      ---
+      duration_ms: 0.570404
+      type: 'test'
+      ...
+    # Subtest: K. Mobile Login: Multiple sequential login attempts are safe and idempotent
+    ok 11 - K. Mobile Login: Multiple sequential login attempts are safe and idempotent
+      ---
+      duration_ms: 0.872117
+      type: 'test'
+      ...
+    # Subtest: L. API: Successful manual guest-order claim via Service
+    ok 12 - L. API: Successful manual guest-order claim via Service
+      ---
+      duration_ms: 0.801568
+      type: 'test'
+      ...
+    # Subtest: M. API: Unverified customer rejection
+    ok 13 - M. API: Unverified customer rejection
+      ---
+      duration_ms: 0.434658
+      type: 'test'
+      ...
+    # Subtest: N. API: Controller ignores rogue customerId in body
+    ok 14 - N. API: Controller ignores rogue customerId in body
+      ---
+      duration_ms: 0.616243
+      type: 'test'
+      ...
+    # Subtest: O. API: Unauthenticated request -> 401 via Middleware
+    ok 15 - O. API: Unauthenticated request -> 401 via Middleware
+      ---
+      duration_ms: 0.650122
+      type: 'test'
+      ...
+    # Subtest: P. API: Concurrent claim behavior
+    ok 16 - P. API: Concurrent claim behavior
+      ---
+      duration_ms: 0.646902
+      type: 'test'
+      ...
+    # Subtest: Q. API: Claim by verified email only
+    ok 17 - Q. API: Claim by verified email only
+      ---
+      duration_ms: 0.39153
+      type: 'test'
+      ...
+    # Subtest: R. API: Soft deleted order exclusion
+    ok 18 - R. API: Soft deleted order exclusion
+      ---
+      duration_ms: 0.38188
+      type: 'test'
+      ...
+    # Subtest: S. API: Inactive customer rejection
+    ok 19 - S. API: Inactive customer rejection
+      ---
+      duration_ms: 0.226124
+      type: 'test'
+      ...
+    # Subtest: T. API: Deleted customer rejection
+    ok 20 - T. API: Deleted customer rejection
+      ---
+      duration_ms: 0.225194
+      type: 'test'
+      ...
+    1..20
+ok 9 - Guest Order Claim & Linking Service Tests
+  ---
+  duration_ms: 21.355187
+  type: 'test'
+  ...
+# ◇ injected env (0) from .env // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
+# 2026-09-01 15:13:46 [31merror[39m: [OtpService] Failed to send SMS
+# Subtest: OTP Service Tests
+    # Subtest: Bangladesh mobile normalization
+    ok 1 - Bangladesh mobile normalization
+      ---
+      duration_ms: 6.791958
+      type: 'test'
+      ...
+    # Subtest: Valid OTP Verification & Single Use
+    ok 2 - Valid OTP Verification & Single Use
+      ---
+      duration_ms: 1.311738
+      type: 'test'
+      ...
+    # Subtest: Wrong OTP & Max Attempts
+    ok 3 - Wrong OTP & Max Attempts
+      ---
+      duration_ms: 1.457985
+      type: 'test'
+      ...
+    # Subtest: Resend Cooldown & Multiple OTP Invalidation
+    ok 4 - Resend Cooldown & Multiple OTP Invalidation
+      ---
+      duration_ms: 1.045059
+      type: 'test'
+      ...
+    # Subtest: Expired OTP
+    ok 5 - Expired OTP
+      ---
+      duration_ms: 4.327623
+      type: 'test'
+      ...
+    # Subtest: Provider Failure
+    ok 6 - Provider Failure
+      ---
+      duration_ms: 51.982184
+      type: 'test'
+      ...
+    # Subtest: No plaintext OTP in response
+    ok 7 - No plaintext OTP in response
+      ---
+      duration_ms: 0.600844
+      type: 'test'
+      ...
+    # Subtest: Duplicate Mobile Registration (Schema Check)
+    ok 8 - Duplicate Mobile Registration (Schema Check)
+      ---
+      duration_ms: 0.783532
+      type: 'test'
+      ...
+    1..8
+ok 10 - OTP Service Tests
+  ---
+  duration_ms: 72.020751
+  type: 'test'
+  ...
+1..10
+# tests 79
+# suites 0
+# pass 77
+# fail 2
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 5989.591219

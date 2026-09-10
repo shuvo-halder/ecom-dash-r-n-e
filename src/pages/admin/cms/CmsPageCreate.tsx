@@ -5,6 +5,7 @@ import { CmsPageForm } from './CmsPageForm';
 import { pageService } from '../../../services/page.service';
 import { ArrowLeft, FileText } from 'lucide-react';
 import { Button } from '../../../components/ui/button';
+import { notify } from '../../../lib/notify';
 
 export function CmsPageCreate() {
   const navigate = useNavigate();
@@ -12,13 +13,13 @@ export function CmsPageCreate() {
 
   const mutation = useMutation({
     mutationFn: pageService.createPage,
-    onSuccess: () => {
+    onSuccess: (res: any) => {
       queryClient.invalidateQueries({ queryKey: ['cms-pages'] });
+      notify.success('CMS Page Created', `Page "${res?.title || 'CMS Page'}" has been published.`);
       navigate('/admin/cms');
     },
     onError: (error: any) => {
-      console.error('Failed to create page', error);
-      alert(error.response?.data?.error?.message || 'Failed to create page. Ensure the slug is unique.');
+      notify.apiError(error, 'Failed to create CMS page. Ensure the slug is unique.');
     }
   });
 

@@ -43,7 +43,7 @@ export const GA4ItemSchema = z.object({
   location_id: z.string().optional(),
   price: z.number().optional(),
   quantity: z.number().optional(),
-  currency: z.string().default("USD").optional(),
+  currency: z.string().default("BDT").optional(),
 });
 
 // GA4 Ecommerce Event Parameters
@@ -58,7 +58,7 @@ export interface GA4EcommerceEventParams {
 }
 
 export const GA4EventParamsSchema = z.object({
-  currency: z.string().default("USD").optional(),
+  currency: z.string().default("BDT").optional(),
   value: z.number().optional(),
   transaction_id: z.string().optional(),
   coupon: z.string().optional(),

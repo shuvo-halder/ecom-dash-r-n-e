@@ -33,7 +33,7 @@ export const ga4Service = {
       item_brand: product.brand?.name || undefined,
       item_category: product.category?.name || undefined,
       price: product.price !== null ? product.price : undefined,
-      currency: "USD",
+      currency: "BDT",
       item_variant: itemVariant,
     };
   },
@@ -42,7 +42,7 @@ export const ga4Service = {
     return {
       event: "view_item",
       ecommerce: {
-        currency: "USD",
+        currency: "BDT",
         value: product.price !== null ? product.price : 0,
         items: [this.mapProductToGa4Item(product)]
       }
@@ -83,7 +83,7 @@ export const ga4Service = {
           item_id: cat.id,
           item_name: cat.name,
           item_category: cat.name,
-          currency: "USD"
+          currency: "BDT"
         }))
       }
     };
@@ -98,7 +98,7 @@ export const ga4Service = {
           item_id: b.id,
           item_name: b.name,
           item_brand: b.name,
-          currency: "USD"
+          currency: "BDT"
         }))
       }
     };

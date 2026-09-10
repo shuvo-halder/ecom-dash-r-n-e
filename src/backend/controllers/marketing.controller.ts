@@ -27,7 +27,7 @@ export const getAllCampaigns = asyncHandler(async (req: Request, res: Response) 
       openRate: "32%",
       clickRate: "12%",
       conversions: 45,
-      revenueGenerated: "$4,820.00",
+      revenueGenerated: "৳4,820.00",
     },
   }));
 
@@ -73,7 +73,7 @@ export const createCampaign = asyncHandler(async (req: Request, res: Response) =
         openRate: "0%",
         clickRate: "0%",
         conversions: 0,
-        revenueGenerated: "$0.00",
+        revenueGenerated: "৳0.00",
       }),
     },
   });

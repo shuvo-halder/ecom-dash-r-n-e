@@ -84,6 +84,9 @@ export interface StorefrontProduct {
   // Stock & Inventory
   stock?: number;
   inStock?: boolean;
+  
+  rating?: number;
+  reviewCount?: number;
 }
 
 export interface PaginatedResponse<T> {

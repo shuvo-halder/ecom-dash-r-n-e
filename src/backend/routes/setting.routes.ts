@@ -1,6 +1,7 @@
 import express from "express";
 import { 
   getGeneral, updateGeneral,
+  getStore, updateStore,
   getBranding, updateBranding,
   getSEO, updateSEO,
   getSMTP, updateSMTP,
@@ -9,6 +10,7 @@ import {
   getShipping, updateShipping,
   getTax, updateTax
 } from "../controllers/setting.controller";
+import { CourierController } from "../controllers/courier.controller";
 import { requireAuth, requirePermission } from "../middlewares/auth";
 import { validateBody } from "../middlewares/validation";
 import { 
@@ -48,5 +50,15 @@ router.put("/shipping", requirePermission("Settings", "write"), validateBody(upd
 
 router.get("/tax", requirePermission("Settings", "read"), getTax);
 router.put("/tax", requirePermission("Settings", "write"), validateBody(updateTaxSettingsSchema), updateTax);
+
+router.get('/store', requirePermission('Settings', 'read'), getStore);
+router.put('/store', requirePermission('Settings', 'write'), updateStore);
+
+// Courier provider endpoints under settings
+router.get("/couriers", requirePermission("Settings", "read"), CourierController.listProviders);
+router.get("/couriers/:id", requirePermission("Settings", "read"), CourierController.getProvider);
+router.put("/couriers/:id", requirePermission("Settings", "write"), CourierController.updateProviderConfig);
+router.post("/couriers/:id/test", requirePermission("Settings", "write"), CourierController.testProvider);
+router.post("/couriers/active", requirePermission("Settings", "write"), CourierController.setActiveProvider);
 
 export default router;

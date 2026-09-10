@@ -5,6 +5,7 @@ import { CategoryForm } from './CategoryForm';
 import { getCategoryById, updateCategory } from '../../services/category.service';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/src/components/ui/button';
+import { notify } from '@/src/lib/notify';
 
 export function CategoryEdit() {
   const { id } = useParams<{ id: string }>();
@@ -19,19 +20,19 @@ export function CategoryEdit() {
 
   const mutation = useMutation({
     mutationFn: (data: any) => updateCategory(id!, data),
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['categories'] });
       queryClient.invalidateQueries({ queryKey: ['category', id] });
+      notify.success('Category Updated', `Changes to "${data?.name || category?.name || 'Category'}" were saved successfully.`);
       navigate('/categories');
     },
     onError: (error: any) => {
-      console.error('Failed to update category', error);
-      alert(error.response?.data?.error?.message || 'Failed to update category');
+      notify.apiError(error, 'Failed to update category. Please verify the input.');
     }
   });
 
   if (isLoading) {
-    return <div className="p-8 text-center text-muted-foreground">Loading...</div>;
+    return <div className="p-8 text-center text-muted-foreground">Loading category details...</div>;
   }
 
   if (!category) {
@@ -51,3 +52,4 @@ export function CategoryEdit() {
     </div>
   );
 }
+

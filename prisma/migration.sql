@@ -123,7 +123,7 @@ CREATE TABLE "Customer" (
 -- CreateTable
 CREATE TABLE "CustomerNote" (
     "id" TEXT NOT NULL,
-    "customerId" TEXT NOT NULL,
+    "customerId" TEXT,
     "note" TEXT NOT NULL,
     "author" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -167,8 +167,14 @@ CREATE TABLE "Category" (
     "description" TEXT,
     "image" TEXT,
     "icon" TEXT,
-    "seoTitle" TEXT,
-    "seoDescription" TEXT,
+    "metaTitle" TEXT,
+    "metaDescription" TEXT,
+    "metaKeywords" TEXT,
+    "canonicalUrl" TEXT,
+    "ogTitle" TEXT,
+    "ogDescription" TEXT,
+    "ogImage" TEXT,
+    "robots" TEXT,
     "sortOrder" INTEGER NOT NULL DEFAULT 0,
     "parentId" TEXT,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
@@ -289,7 +295,12 @@ CREATE TABLE "Product" (
     "shortDescription" TEXT,
     "metaTitle" TEXT,
     "metaDescription" TEXT,
+    "metaKeywords" TEXT,
+    "canonicalUrl" TEXT,
+    "ogTitle" TEXT,
+    "ogDescription" TEXT,
     "ogImage" TEXT,
+    "robots" TEXT,
     "trackInventory" BOOLEAN NOT NULL DEFAULT true,
     "status" TEXT NOT NULL DEFAULT 'Draft',
     "gtin" TEXT,
@@ -380,10 +391,14 @@ CREATE TABLE "Inventory" (
 CREATE TABLE "Order" (
     "id" TEXT NOT NULL,
     "orderNumber" TEXT NOT NULL,
-    "customerId" TEXT NOT NULL,
+    "customerId" TEXT,
     "status" TEXT NOT NULL DEFAULT 'Pending',
     "paymentStatus" TEXT NOT NULL DEFAULT 'Unpaid',
     "totalAmount" DECIMAL(65,30) NOT NULL,
+    "subtotal" DECIMAL(65,30),
+    "taxAmount" DECIMAL(65,30),
+    "shippingFee" DECIMAL(65,30),
+    "discountAmount" DECIMAL(65,30),
     "shippingAddress" TEXT,
     "billingAddress" TEXT,
     "paymentMethod" TEXT,
@@ -393,6 +408,8 @@ CREATE TABLE "Order" (
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
     "deletedAt" TIMESTAMP(3),
+    "purchaseTracked" BOOLEAN NOT NULL DEFAULT false,
+    "purchaseTrackedAt" TIMESTAMP(3),
     "notificationPreferenceId" TEXT,
 
     CONSTRAINT "Order_pkey" PRIMARY KEY ("id")
@@ -406,6 +423,13 @@ CREATE TABLE "OrderItem" (
     "productVariantId" TEXT,
     "quantity" INTEGER NOT NULL,
     "price" DECIMAL(65,30) NOT NULL,
+    "productName" TEXT,
+    "productSku" TEXT,
+    "variantSku" TEXT,
+    "subtotal" DECIMAL(65,30),
+    "taxAmount" DECIMAL(65,30),
+    "discountAmount" DECIMAL(65,30),
+    "total" DECIMAL(65,30),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -539,7 +563,7 @@ CREATE TABLE "Popup" (
 CREATE TABLE "Review" (
     "id" TEXT NOT NULL,
     "productId" TEXT NOT NULL,
-    "customerId" TEXT NOT NULL,
+    "customerId" TEXT,
     "rating" INTEGER NOT NULL DEFAULT 5,
     "comment" TEXT,
     "isApproved" BOOLEAN NOT NULL DEFAULT false,
@@ -736,7 +760,7 @@ CREATE TABLE "FAQ" (
 -- CreateTable
 CREATE TABLE "CustomerAddress" (
     "id" TEXT NOT NULL,
-    "customerId" TEXT NOT NULL,
+    "customerId" TEXT,
     "label" TEXT,
     "fullName" TEXT NOT NULL,
     "phone" TEXT,
@@ -756,7 +780,7 @@ CREATE TABLE "CustomerAddress" (
 -- CreateTable
 CREATE TABLE "CustomerRefreshToken" (
     "id" TEXT NOT NULL,
-    "customerId" TEXT NOT NULL,
+    "customerId" TEXT,
     "tokenHash" TEXT NOT NULL,
     "expiresAt" TIMESTAMP(3) NOT NULL,
     "ipAddress" TEXT,
@@ -770,7 +794,7 @@ CREATE TABLE "CustomerRefreshToken" (
 -- CreateTable
 CREATE TABLE "CustomerSession" (
     "id" TEXT NOT NULL,
-    "customerId" TEXT NOT NULL,
+    "customerId" TEXT,
     "token" TEXT NOT NULL,
     "expiresAt" TIMESTAMP(3) NOT NULL,
     "ipAddress" TEXT,
@@ -804,7 +828,8 @@ CREATE TABLE "WishlistItem" (
 -- CreateTable
 CREATE TABLE "Cart" (
     "id" TEXT NOT NULL,
-    "customerId" TEXT NOT NULL,
+    "customerId" TEXT,
+    "sessionId" TEXT,
     "shippingAddressId" TEXT,
     "billingAddressId" TEXT,
     "couponId" TEXT,
@@ -832,10 +857,10 @@ CREATE TABLE "CartItem" (
 CREATE TABLE "Payment" (
     "id" TEXT NOT NULL,
     "orderId" TEXT NOT NULL,
-    "customerId" TEXT NOT NULL,
+    "customerId" TEXT,
     "provider" "PaymentProvider" NOT NULL DEFAULT 'COD',
     "amount" DECIMAL(65,30) NOT NULL,
-    "currency" TEXT NOT NULL DEFAULT 'USD',
+    "currency" TEXT NOT NULL DEFAULT 'BDT',
     "refundedAmount" DECIMAL(65,30) NOT NULL DEFAULT 0,
     "status" "PaymentStatus" NOT NULL DEFAULT 'PENDING',
     "transactionReference" TEXT,
@@ -880,12 +905,14 @@ CREATE TABLE "Refund" (
     "orderId" TEXT NOT NULL,
     "customerId" TEXT NOT NULL,
     "amount" DECIMAL(65,30) NOT NULL,
-    "currency" TEXT NOT NULL DEFAULT 'USD',
+    "currency" TEXT NOT NULL DEFAULT 'BDT',
     "refundedAmount" DECIMAL(65,30) NOT NULL DEFAULT 0,
     "status" "RefundStatus" NOT NULL DEFAULT 'PENDING',
     "reason" TEXT,
     "transactionReference" TEXT,
     "completedAt" TIMESTAMP(3),
+    "refundTracked" BOOLEAN NOT NULL DEFAULT false,
+    "refundTrackedAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -1089,7 +1116,7 @@ CREATE TABLE "BrandingSetting" (
     "primaryColor" TEXT,
     "footerText" TEXT,
     "defaultLanguage" TEXT NOT NULL DEFAULT 'en',
-    "defaultCurrency" TEXT NOT NULL DEFAULT 'USD',
+    "defaultCurrency" TEXT NOT NULL DEFAULT 'BDT',
     "defaultTimezone" TEXT NOT NULL DEFAULT 'UTC',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
@@ -1140,6 +1167,9 @@ CREATE TABLE "AnalyticsSetting" (
     "googleAnalyticsId" TEXT,
     "googleTagManagerId" TEXT,
     "facebookPixelId" TEXT,
+    "tiktokPixelId" TEXT,
+    "googleAdsId" TEXT,
+    "ga4ApiSecret" TEXT,
     "hotjarId" TEXT,
     "enableAnalytics" BOOLEAN NOT NULL DEFAULT false,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -1184,6 +1214,17 @@ CREATE TABLE "TaxSetting" (
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "TaxSetting_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "StoreSetting" (
+    "id" TEXT NOT NULL,
+    "whatsappOrderNumber" TEXT,
+    "callOrderNumber" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "StoreSetting_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -1496,7 +1537,13 @@ CREATE UNIQUE INDEX "WishlistItem_wishlistId_productId_key" ON "WishlistItem"("w
 CREATE UNIQUE INDEX "Cart_customerId_key" ON "Cart"("customerId");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "Cart_sessionId_key" ON "Cart"("sessionId");
+
+-- CreateIndex
 CREATE INDEX "Cart_customerId_idx" ON "Cart"("customerId");
+
+-- CreateIndex
+CREATE INDEX "Cart_sessionId_idx" ON "Cart"("sessionId");
 
 -- CreateIndex
 CREATE INDEX "Cart_couponId_idx" ON "Cart"("couponId");
@@ -1682,7 +1729,7 @@ ALTER TABLE "Inventory" ADD CONSTRAINT "Inventory_variantId_fkey" FOREIGN KEY ("
 ALTER TABLE "Inventory" ADD CONSTRAINT "Inventory_productId_fkey" FOREIGN KEY ("productId") REFERENCES "Product"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Order" ADD CONSTRAINT "Order_customerId_fkey" FOREIGN KEY ("customerId") REFERENCES "Customer"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "Order" ADD CONSTRAINT "Order_customerId_fkey" FOREIGN KEY ("customerId") REFERENCES "Customer"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Order" ADD CONSTRAINT "Order_assignedStaffId_fkey" FOREIGN KEY ("assignedStaffId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
@@ -1712,7 +1759,7 @@ ALTER TABLE "OrderNote" ADD CONSTRAINT "OrderNote_orderId_fkey" FOREIGN KEY ("or
 ALTER TABLE "Review" ADD CONSTRAINT "Review_productId_fkey" FOREIGN KEY ("productId") REFERENCES "Product"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Review" ADD CONSTRAINT "Review_customerId_fkey" FOREIGN KEY ("customerId") REFERENCES "Customer"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "Review" ADD CONSTRAINT "Review_customerId_fkey" FOREIGN KEY ("customerId") REFERENCES "Customer"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "ActivityLog" ADD CONSTRAINT "ActivityLog_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
@@ -1863,8 +1910,4 @@ ALTER TABLE "_PostTags" ADD CONSTRAINT "_PostTags_A_fkey" FOREIGN KEY ("A") REFE
 
 -- AddForeignKey
 ALTER TABLE "_PostTags" ADD CONSTRAINT "_PostTags_B_fkey" FOREIGN KEY ("B") REFERENCES "BlogTag"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AlterTable
-ALTER TABLE "Order" ADD COLUMN "purchaseTracked" BOOLEAN NOT NULL DEFAULT false,
-ADD COLUMN "purchaseTrackedAt" TIMESTAMP(3);
 

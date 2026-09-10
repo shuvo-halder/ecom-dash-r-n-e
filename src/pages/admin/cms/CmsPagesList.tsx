@@ -30,6 +30,8 @@ import {
   CheckCircle2,
   FileEdit,
 } from 'lucide-react';
+import { ConfirmDialog } from '../../../components/common/ConfirmDialog';
+import { notify } from '../../../lib/notify';
 
 export function CmsPagesList() {
   const navigate = useNavigate();
@@ -61,10 +63,11 @@ export function CmsPagesList() {
     mutationFn: pageService.deletePage,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cms-pages'] });
+      notify.success('Page Deleted', `CMS page "${confirmDeleteTitle}" has been removed.`);
       setConfirmDeleteId(null);
     },
     onError: (err: any) => {
-      alert(err.response?.data?.error?.message || 'Failed to delete page.');
+      notify.apiError(err, 'Failed to delete CMS page.');
       setConfirmDeleteId(null);
     },
   });
@@ -360,47 +363,20 @@ export function CmsPagesList() {
         </div>
       )}
 
-      {/* Delete Confirmation Modal Overlay */}
-      {confirmDeleteId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-background border rounded-lg shadow-lg max-w-md w-full mx-4 overflow-hidden animate-in fade-in zoom-in-95 duration-250">
-            <div className="p-6 space-y-4">
-              <div className="flex items-center gap-3 text-destructive">
-                <div className="p-2 rounded-full bg-destructive/10">
-                  <AlertTriangle className="h-6 w-6" />
-                </div>
-                <h3 className="text-lg font-bold">Confirm Page Deletion</h3>
-              </div>
-              <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">
-                  Are you sure you want to delete the CMS page <strong>"{confirmDeleteTitle}"</strong>?
-                </p>
-                <p className="text-xs text-destructive bg-destructive/5 p-2 rounded border border-destructive/10">
-                  Warning: This action marks the page as deleted and takes it offline. This cannot be undone.
-                </p>
-              </div>
-              <div className="flex justify-end gap-2 pt-2">
-                <Button
-                  id="cancel-delete-modal-btn"
-                  variant="outline"
-                  onClick={() => setConfirmDeleteId(null)}
-                  disabled={deleteMutation.isPending}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  id="confirm-delete-modal-btn"
-                  variant="destructive"
-                  onClick={confirmDelete}
-                  disabled={deleteMutation.isPending}
-                >
-                  {deleteMutation.isPending ? 'Deleting...' : 'Delete Permanently'}
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        isOpen={!!confirmDeleteId}
+        onOpenChange={(open) => !open && setConfirmDeleteId(null)}
+        title="Confirm Page Deletion"
+        description={
+          <>
+            Are you sure you want to delete the CMS page <strong>"{confirmDeleteTitle}"</strong>? This will immediately take the page offline.
+          </>
+        }
+        confirmText="Delete Permanently"
+        variant="destructive"
+        isLoading={deleteMutation.isPending}
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 }

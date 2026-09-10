@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { 
+  Star,
   LayoutDashboard, 
   Package, 
   ShoppingCart, 
@@ -37,7 +38,8 @@ import {
   PieChart,
   Shield,
   Mail,
-  Sliders
+  Sliders,
+  Archive
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { Button } from '../ui/button';
@@ -53,6 +55,7 @@ interface NavSubItem {
   label: string;
   href: string;
   module: string;
+  requiredPermission?: string;
   icon: React.ElementType;
 }
 
@@ -68,6 +71,7 @@ interface StandaloneNavItem {
   title: string;
   href: string;
   module: string;
+  requiredPermission?: string;
   icon: React.ElementType;
 }
 
@@ -78,7 +82,7 @@ type MenuItem =
 const STORAGE_KEY = 'enterprise_sidebar_expanded_groups';
 
 export function Sidebar({ isOpen, onToggle }: SidebarProps) {
-  const { hasPermission } = useAuth();
+  const { can, user } = useAuth();
   const { branding } = useBranding();
   const location = useLocation();
   const [logoError, setLogoError] = useState(false);
@@ -117,7 +121,7 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
     saveExpandedGroups(updated);
   };
 
-  // Full Information Architecture Navigation Schema
+  // Full Information Architecture Navigation Schema with Required Permissions
   const menuStructure: MenuItem[] = [
     {
       type: 'standalone',
@@ -126,6 +130,7 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
         title: 'Dashboard',
         href: '/',
         module: 'Dashboard',
+        requiredPermission: 'Dashboard.read',
         icon: LayoutDashboard
       }
     },
@@ -136,9 +141,9 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
         title: 'User Management',
         icon: UserCog,
         items: [
-          { label: 'Users', href: '/admin/users', module: 'Users', icon: Users },
-          { label: 'Roles', href: '/admin/roles', module: 'Roles', icon: Key },
-          { label: 'Permissions', href: '/admin/roles', module: 'Roles', icon: ShieldCheck }
+          { label: 'Users', href: '/admin/users', module: 'Users', requiredPermission: 'Users.read', icon: Users },
+          { label: 'Roles', href: '/admin/roles', module: 'Roles', requiredPermission: 'Roles.read', icon: Key },
+          { label: 'Permissions', href: '/admin/roles', module: 'Roles', requiredPermission: 'Roles.read', icon: ShieldCheck }
         ]
       }
     },
@@ -149,8 +154,8 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
         title: 'Customer Management',
         icon: Users,
         items: [
-          { label: 'Customers', href: '/customers', module: 'Customers', icon: Users },
-          { label: 'Customer Activity', href: '/admin/sessions', module: 'Sessions', icon: Activity }
+          { label: 'Customers', href: '/customers', module: 'Customers', requiredPermission: 'Customers.read', icon: Users },
+          { label: 'Customer Activity', href: '/admin/sessions', module: 'Sessions', requiredPermission: 'Sessions.read', icon: Activity }
         ]
       }
     },
@@ -161,11 +166,12 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
         title: 'Catalog Management',
         icon: Boxes,
         items: [
-          { label: 'Categories', href: '/categories', module: 'Categories', icon: FolderTree },
-          { label: 'Brands', href: '/brands', module: 'Brands', icon: Tag },
-          { label: 'Products', href: '/products', module: 'Products', icon: Package },
-          { label: 'Variants', href: '/products', module: 'Products', icon: Layers },
-          { label: 'Inventory', href: '/inventory', module: 'Inventory', icon: Boxes }
+          { label: 'Categories', href: '/categories', module: 'Categories', requiredPermission: 'Categories.read', icon: FolderTree },
+          { label: 'Brands', href: '/brands', module: 'Brands', requiredPermission: 'Brands.read', icon: Tag },
+          { label: 'Products', href: '/products', module: 'Products', requiredPermission: 'Products.read', icon: Package },
+          { label: 'Reviews', href: '/admin/reviews', module: 'Products', requiredPermission: 'Products.read', icon: Star },
+          { label: 'Variants', href: '/products', module: 'Products', requiredPermission: 'Products.read', icon: Layers },
+          { label: 'Inventory', href: '/inventory', module: 'Inventory', requiredPermission: 'Inventory.read', icon: Boxes }
         ]
       }
     },
@@ -176,11 +182,11 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
         title: 'Sales & Fulfillment',
         icon: ShoppingCart,
         items: [
-          { label: 'Orders', href: '/orders', module: 'Orders', icon: ShoppingCart },
-          { label: 'Payments', href: '/admin/payments', module: 'Payments', icon: CreditCard },
-          { label: 'Refunds', href: '/admin/refunds', module: 'Refunds', icon: RotateCcw },
-          { label: 'Returns', href: '/admin/returns', module: 'Returns', icon: Undo2 },
-          { label: 'Shipments', href: '/admin/shipments', module: 'Shipments', icon: Truck }
+          { label: 'Orders', href: '/orders', module: 'Orders', requiredPermission: 'Orders.read', icon: ShoppingCart },
+          { label: 'Payments', href: '/admin/payments', module: 'Payments', requiredPermission: 'Payments.read', icon: CreditCard },
+          { label: 'Refunds', href: '/admin/refunds', module: 'Refunds', requiredPermission: 'Refunds.read', icon: RotateCcw },
+          { label: 'Returns', href: '/admin/returns', module: 'Returns', requiredPermission: 'Returns.read', icon: Undo2 },
+          { label: 'Shipments', href: '/admin/shipments', module: 'Shipments', requiredPermission: 'Shipments.read', icon: Truck }
         ]
       }
     },
@@ -191,11 +197,11 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
         title: 'Marketing',
         icon: Megaphone,
         items: [
-          { label: 'Coupons', href: '/admin/coupons', module: 'Coupons', icon: Ticket },
-          { label: 'Promotions', href: '/admin/promotions', module: 'Promotions', icon: Zap },
-          { label: 'Banners', href: '/admin/banners', module: 'Banners', icon: Image },
-          { label: 'Popups', href: '/admin/popups', module: 'Popups', icon: Layers },
-          { label: 'Campaigns', href: '/admin/marketing', module: 'Marketing', icon: Megaphone }
+          { label: 'Coupons', href: '/admin/coupons', module: 'Coupons', requiredPermission: 'Coupons.read', icon: Ticket },
+          { label: 'Promotions', href: '/admin/promotions', module: 'Promotions', requiredPermission: 'Promotions.read', icon: Zap },
+          { label: 'Banners', href: '/admin/banners', module: 'Banners', requiredPermission: 'Banners.read', icon: Image },
+          { label: 'Popups', href: '/admin/popups', module: 'Popups', requiredPermission: 'Popups.read', icon: Layers },
+          { label: 'Campaigns', href: '/admin/marketing', module: 'Marketing', requiredPermission: 'Marketing.read', icon: Megaphone }
         ]
       }
     },
@@ -206,11 +212,11 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
         title: 'Content Management',
         icon: FileText,
         items: [
-          { label: 'CMS Pages', href: '/admin/cms', module: 'CMS', icon: FileText },
-          { label: 'Blog', href: '/admin/blog', module: 'Blog', icon: PenTool },
-          { label: 'FAQ', href: '/admin/faqs', module: 'FAQ', icon: HelpCircle },
-          { label: 'Media Library', href: '/admin/media', module: 'Media', icon: Image },
-          { label: 'Landing Pages', href: '/admin/landing-pages', module: 'LandingPages', icon: LayoutTemplate }
+          { label: 'CMS Pages', href: '/admin/cms', module: 'CMS', requiredPermission: 'CMS.read', icon: FileText },
+          { label: 'Blog', href: '/admin/blog', module: 'Blog', requiredPermission: 'Blog.read', icon: PenTool },
+          { label: 'FAQ', href: '/admin/faqs', module: 'FAQ', requiredPermission: 'FAQ.read', icon: HelpCircle },
+          { label: 'Media Library', href: '/admin/media', module: 'Media', requiredPermission: 'Media.read', icon: Image },
+          { label: 'Landing Pages', href: '/admin/landing-pages', module: 'LandingPages', requiredPermission: 'LandingPages.read', icon: LayoutTemplate }
         ]
       }
     },
@@ -221,8 +227,8 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
         title: 'Analytics & Reports',
         icon: BarChart3,
         items: [
-          { label: 'Analytics', href: '/analytics', module: 'Analytics', icon: BarChart3 },
-          { label: 'Audit Logs', href: '/admin/audit-logs', module: 'AuditLogs', icon: ShieldCheck }
+          { label: 'Analytics', href: '/analytics', module: 'Analytics', requiredPermission: 'Analytics.read', icon: BarChart3 },
+          { label: 'Audit Logs', href: '/admin/audit-logs', module: 'AuditLogs', requiredPermission: 'AuditLogs.read', icon: ShieldCheck }
         ]
       }
     },
@@ -233,19 +239,70 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
         title: 'System',
         icon: Settings,
         items: [
-          { label: 'Notifications', href: '/admin/notifications', module: 'Notifications', icon: Bell },
-          { label: 'Settings', href: '/settings', module: 'Settings', icon: Settings },
-          { label: 'SEO Settings', href: '/admin/seo', module: 'SEO', icon: Search },
-          { label: 'Security & Auth', href: '/settings', module: 'Settings', icon: Shield }
+          { label: 'Notifications', href: '/admin/notifications', module: 'Notifications', requiredPermission: 'Notifications.read', icon: Bell },
+          { label: 'Archive', href: '/admin/archive', module: 'Archive', requiredPermission: 'Archive.read', icon: Archive },
+          { label: 'Settings', href: '/settings', module: 'Settings', requiredPermission: 'Settings.read', icon: Settings },
+          { label: 'SEO Settings', href: '/admin/seo', module: 'SEO', requiredPermission: 'SEO.read', icon: Search },
+          { label: 'Security & Auth', href: '/settings', module: 'Settings', requiredPermission: 'Settings.read', icon: Shield }
         ]
       }
     }
   ];
 
+  // Calculate filtered visible menus for the current user's effective permissions
+  const visibleMenus = menuStructure.map((menu) => {
+    if (menu.type === 'standalone') {
+      const isVisible = can(menu.data.requiredPermission || `${menu.data.module}.read`);
+      return isVisible ? menu : null;
+    }
+    const visibleItems = menu.data.items.filter((sub) =>
+      can(sub.requiredPermission || `${sub.module}.read`)
+    );
+    if (visibleItems.length === 0) return null;
+    return {
+      type: 'group' as const,
+      data: {
+        ...menu.data,
+        items: visibleItems,
+      },
+    };
+  }).filter(Boolean) as MenuItem[];
+
   // Helper to check if a pathname matches a route
   const isRouteActive = (href: string) => {
-    if (href === '/') return location.pathname === '/';
-    return location.pathname.startsWith(href);
+    if (!href) return false;
+    
+    // Normalize path to strip trailing slash
+    const path = location.pathname.endsWith('/') && location.pathname !== '/'
+      ? location.pathname.slice(0, -1) 
+      : location.pathname;
+      
+    const targetHref = href.endsWith('/') && href !== '/'
+      ? href.slice(0, -1) 
+      : href;
+      
+    if (path === targetHref) return true;
+    if (targetHref === '/') return path === '/';
+
+    // Segment-aware child matching (e.g. /orders/123 matches /orders)
+    if (path.startsWith(targetHref + '/')) return true;
+
+    // Handle common alias paths where 'admin/' is prefixed to the path
+    if (path.startsWith('/admin' + targetHref)) {
+        if (path === '/admin' + targetHref || path.startsWith('/admin' + targetHref + '/')) {
+            return true;
+        }
+    }
+    
+    // Reverse alias: if href has /admin but path doesn't
+    if (targetHref.startsWith('/admin/')) {
+        const nonAdminHref = targetHref.replace('/admin', '');
+        if (path === nonAdminHref || path.startsWith(nonAdminHref + '/')) {
+            return true;
+        }
+    }
+
+    return false;
   };
 
   // Automatically expand group containing current active route
@@ -352,151 +409,158 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
 
         {/* Scrollable Navigation Area */}
         <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-1 scrollbar-thin">
-          {menuStructure.map((menu) => {
-            if (menu.type === 'standalone') {
-              const item = menu.data;
-              const isVisible = item.module === 'Dashboard' || hasPermission(item.module, 'read');
-              if (!isVisible) return null;
+          {visibleMenus.length === 0 ? (
+            <div className="px-3 py-6 text-center text-xs text-muted-foreground">
+              {isOpen ? (
+                <>
+                  <p className="font-semibold text-foreground mb-1">No Modules Permitted</p>
+                  <p>Contact your administrator to grant role permissions.</p>
+                </>
+              ) : (
+                <div className="h-2 w-2 rounded-full bg-muted-foreground mx-auto" />
+              )}
+            </div>
+          ) : (
+            visibleMenus.map((menu) => {
+              if (menu.type === 'standalone') {
+                const item = menu.data;
+                const active = isRouteActive(item.href);
+                const Icon = item.icon;
 
-              const active = isRouteActive(item.href);
-              const Icon = item.icon;
+                return (
+                  <div key={item.id} className="relative group">
+                    <NavLink
+                      to={item.href}
+                      onClick={handleMobileNavClick}
+                      className={cn(
+                        "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150",
+                        active
+                          ? "bg-primary text-primary-foreground font-semibold shadow-sm"
+                          : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800/60",
+                        !isOpen && "justify-center px-0"
+                      )}
+                    >
+                      <Icon className="h-5 w-5 shrink-0" />
+                      {isOpen && <span className="truncate">{item.title}</span>}
+                    </NavLink>
+
+                    {/* Hover Tooltip in Collapsed Mode */}
+                    {!isOpen && (
+                      <div className="invisible opacity-0 group-hover:visible group-hover:opacity-100 pointer-events-none absolute left-full ml-2.5 top-1/2 -translate-y-1/2 z-50 bg-slate-900 text-slate-100 dark:bg-slate-800 border border-slate-700/80 shadow-xl rounded-md px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition-all duration-150">
+                        {item.title}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+
+              // Group Navigation Item
+              const group = menu.data;
+              const isGroupExpanded = !!expandedGroups[group.id];
+              const isAnyChildActive = group.items.some(sub => isRouteActive(sub.href));
+              const GroupIcon = group.icon;
 
               return (
-                <div key={item.id} className="relative group">
-                  <NavLink
-                    to={item.href}
-                    onClick={handleMobileNavClick}
-                    className={cn(
-                      "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150",
-                      active
-                        ? "bg-primary text-primary-foreground font-semibold shadow-sm"
-                        : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800/60",
-                      !isOpen && "justify-center px-0"
-                    )}
-                  >
-                    <Icon className="h-5 w-5 shrink-0" />
-                    {isOpen && <span className="truncate">{item.title}</span>}
-                  </NavLink>
+                <div key={group.id} className="relative group">
+                  {/* Expanded Sidebar View */}
+                  {isOpen ? (
+                    <div className="space-y-1">
+                      <button
+                        type="button"
+                        onClick={() => toggleGroup(group.id)}
+                        className={cn(
+                          "w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+                          isAnyChildActive
+                            ? "text-primary font-semibold bg-primary/10 dark:bg-primary/20"
+                            : "text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800/60"
+                        )}
+                      >
+                        <div className="flex items-center gap-3 overflow-hidden">
+                          <GroupIcon className={cn("h-5 w-5 shrink-0", isAnyChildActive && "text-primary")} />
+                          <span className="truncate">{group.title}</span>
+                        </div>
+                        <ChevronDown
+                          className={cn(
+                            "h-4 w-4 shrink-0 transition-transform duration-200 text-slate-400",
+                            isGroupExpanded && "rotate-180 text-foreground"
+                          )}
+                        />
+                      </button>
 
-                  {/* Hover Tooltip in Collapsed Mode */}
-                  {!isOpen && (
-                    <div className="invisible opacity-0 group-hover:visible group-hover:opacity-100 pointer-events-none absolute left-full ml-2.5 top-1/2 -translate-y-1/2 z-50 bg-slate-900 text-slate-100 dark:bg-slate-800 border border-slate-700/80 shadow-xl rounded-md px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition-all duration-150">
-                      {item.title}
+                      {/* Accordion Sub-items List */}
+                      {isGroupExpanded && (
+                        <div className="pl-4 pr-1 space-y-1 pt-0.5 pb-1">
+                          {group.items.map((sub) => {
+                            const SubIcon = sub.icon;
+                            const active = isRouteActive(sub.href);
+                            return (
+                              <NavLink
+                                key={sub.label + sub.href}
+                                to={sub.href}
+                                onClick={handleMobileNavClick}
+                                className={cn(
+                                  "flex items-center gap-2.5 px-3 py-2 rounded-md text-xs font-medium transition-colors",
+                                  active
+                                    ? "bg-primary/15 text-primary font-bold dark:bg-primary/25"
+                                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800/60"
+                                )}
+                              >
+                                <SubIcon className="h-3.5 w-3.5 shrink-0 opacity-80" />
+                                <span className="truncate">{sub.label}</span>
+                              </NavLink>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    /* Collapsed Sidebar View with Flyout Hover Menu */
+                    <div>
+                      <button
+                        type="button"
+                        className={cn(
+                          "w-full flex items-center justify-center p-2.5 rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors",
+                          isAnyChildActive && "bg-primary/10 text-primary font-semibold dark:bg-primary/20"
+                        )}
+                      >
+                        <GroupIcon className="h-5 w-5 shrink-0" />
+                      </button>
+
+                      {/* Flyout Sub-menu Card on Hover */}
+                      <div className="invisible opacity-0 group-hover:visible group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto absolute left-full ml-2.5 top-0 z-50 bg-slate-900 text-slate-100 dark:bg-slate-800 border border-slate-700/80 shadow-2xl rounded-xl p-2.5 min-w-[200px] transition-all duration-200">
+                        <div className="px-2 py-1 text-xs font-bold uppercase tracking-wider text-slate-400 border-b border-slate-700/80 mb-1.5 flex items-center gap-2">
+                          <GroupIcon className="h-3.5 w-3.5 text-primary" />
+                          <span>{group.title}</span>
+                        </div>
+                        <div className="space-y-0.5">
+                          {group.items.map((sub) => {
+                            const SubIcon = sub.icon;
+                            const active = isRouteActive(sub.href);
+                            return (
+                              <NavLink
+                                key={sub.label + sub.href}
+                                to={sub.href}
+                                onClick={handleMobileNavClick}
+                                className={cn(
+                                  "flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors",
+                                  active
+                                    ? "bg-primary text-primary-foreground font-bold"
+                                    : "text-slate-300 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-700"
+                                )}
+                              >
+                                <SubIcon className="h-3.5 w-3.5 shrink-0" />
+                                <span className="truncate">{sub.label}</span>
+                              </NavLink>
+                            );
+                          })}
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
               );
-            }
-
-            // Group Navigation Item
-            const group = menu.data;
-            const visibleItems = group.items.filter(sub => hasPermission(sub.module, 'read'));
-            if (visibleItems.length === 0) return null;
-
-            const isGroupExpanded = !!expandedGroups[group.id];
-            const isAnyChildActive = visibleItems.some(sub => isRouteActive(sub.href));
-            const GroupIcon = group.icon;
-
-            return (
-              <div key={group.id} className="relative group">
-                {/* Expanded Sidebar View */}
-                {isOpen ? (
-                  <div className="space-y-1">
-                    <button
-                      type="button"
-                      onClick={() => toggleGroup(group.id)}
-                      className={cn(
-                        "w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
-                        isAnyChildActive
-                          ? "text-primary font-semibold bg-primary/10 dark:bg-primary/20"
-                          : "text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800/60"
-                      )}
-                    >
-                      <div className="flex items-center gap-3 overflow-hidden">
-                        <GroupIcon className={cn("h-5 w-5 shrink-0", isAnyChildActive && "text-primary")} />
-                        <span className="truncate">{group.title}</span>
-                      </div>
-                      <ChevronDown
-                        className={cn(
-                          "h-4 w-4 shrink-0 transition-transform duration-200 text-slate-400",
-                          isGroupExpanded && "rotate-180 text-foreground"
-                        )}
-                      />
-                    </button>
-
-                    {/* Accordion Sub-items List */}
-                    {isGroupExpanded && (
-                      <div className="pl-4 pr-1 space-y-1 pt-0.5 pb-1">
-                        {visibleItems.map((sub) => {
-                          const SubIcon = sub.icon;
-                          const active = isRouteActive(sub.href);
-                          return (
-                            <NavLink
-                              key={sub.label + sub.href}
-                              to={sub.href}
-                              onClick={handleMobileNavClick}
-                              className={cn(
-                                "flex items-center gap-2.5 px-3 py-2 rounded-md text-xs font-medium transition-colors",
-                                active
-                                  ? "bg-primary/15 text-primary font-bold dark:bg-primary/25"
-                                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800/60"
-                              )}
-                            >
-                              <SubIcon className="h-3.5 w-3.5 shrink-0 opacity-80" />
-                              <span className="truncate">{sub.label}</span>
-                            </NavLink>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  /* Collapsed Sidebar View with Flyout Hover Menu */
-                  <div>
-                    <button
-                      type="button"
-                      className={cn(
-                        "w-full flex items-center justify-center p-2.5 rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors",
-                        isAnyChildActive && "bg-primary/10 text-primary font-semibold dark:bg-primary/20"
-                      )}
-                    >
-                      <GroupIcon className="h-5 w-5 shrink-0" />
-                    </button>
-
-                    {/* Flyout Sub-menu Card on Hover */}
-                    <div className="invisible opacity-0 group-hover:visible group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto absolute left-full ml-2.5 top-0 z-50 bg-slate-900 text-slate-100 dark:bg-slate-800 border border-slate-700/80 shadow-2xl rounded-xl p-2.5 min-w-[200px] transition-all duration-200">
-                      <div className="px-2 py-1 text-xs font-bold uppercase tracking-wider text-slate-400 border-b border-slate-700/80 mb-1.5 flex items-center gap-2">
-                        <GroupIcon className="h-3.5 w-3.5 text-primary" />
-                        <span>{group.title}</span>
-                      </div>
-                      <div className="space-y-0.5">
-                        {visibleItems.map((sub) => {
-                          const SubIcon = sub.icon;
-                          const active = isRouteActive(sub.href);
-                          return (
-                            <NavLink
-                              key={sub.label + sub.href}
-                              to={sub.href}
-                              onClick={handleMobileNavClick}
-                              className={cn(
-                                "flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors",
-                                active
-                                  ? "bg-primary text-primary-foreground font-bold"
-                                  : "text-slate-300 hover:text-white hover:bg-slate-800 dark:hover:bg-slate-700"
-                              )}
-                            >
-                              <SubIcon className="h-3.5 w-3.5 shrink-0" />
-                              <span className="truncate">{sub.label}</span>
-                            </NavLink>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
+            })
+          )}
         </nav>
       </aside>
     </>

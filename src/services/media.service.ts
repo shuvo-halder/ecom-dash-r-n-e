@@ -21,6 +21,21 @@ export interface MediaAssetItem {
   updatedAt: string;
 }
 
+export interface MediaUsageReference {
+  type: string;
+  entityId: string;
+  entityName: string;
+  field: string;
+  reference: string;
+  status: 'ACTIVE' | 'ARCHIVED';
+}
+
+export interface MediaUsageResult {
+  used: boolean;
+  referenceCount: number;
+  references: MediaUsageReference[];
+}
+
 export const mediaService = {
   getAssets: async (params?: { folder?: string; search?: string }): Promise<MediaAssetItem[]> => {
     const res = await api.get('/media', { params });
@@ -29,6 +44,21 @@ export const mediaService = {
 
   getAssetById: async (id: string): Promise<MediaAssetItem> => {
     const res = await api.get(`/media/${id}`);
+    return res.data?.data || res.data;
+  },
+
+  getAssetUsage: async (id: string): Promise<MediaUsageResult> => {
+    const res = await api.get(`/media/${id}/usage`);
+    return res.data?.data || res.data;
+  },
+
+  batchDeleteAssets: async (ids: string[]): Promise<{
+    deletedCount: number;
+    deletedIds: string[];
+    blockedCount: number;
+    blocked: Array<{ id: string; reason: string; usage: MediaUsageResult }>;
+  }> => {
+    const res = await api.post('/media/batch-delete', { ids });
     return res.data?.data || res.data;
   },
 

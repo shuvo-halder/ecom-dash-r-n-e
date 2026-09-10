@@ -1,8 +1,20 @@
 const fs = require('fs');
-let content = fs.readFileSync('src/backend/controllers/customer-auth.controller.ts', 'utf8');
-content = content.replace(/\.\.\/\.\.\/config\/db/g, '../config/db');
-content = content.replace(/\.\.\/\.\.\/utils\/AppError/g, '../utils/AppError');
-content = content.replace(/\.\.\/\.\.\/utils\/customerJwt/g, '../utils/customerJwt');
-content = content.replace(/\.\.\/\.\.\/config\/env/g, '../config/env');
-content = content.replace(/\.\.\/\.\.\/middlewares\/customerAuth/g, '../middlewares/customerAuth');
-fs.writeFileSync('src/backend/controllers/customer-auth.controller.ts', content);
+const file = 'src/backend/controllers/storefront/review.controller.ts';
+let content = fs.readFileSync(file, 'utf8');
+
+const newController = `
+
+export const getFeaturedReviews = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const limit = Number(req.query.limit) || 5;
+    const result = await StorefrontReviewService.getFeaturedReviews(limit);
+    res.json({ status: "success", data: result });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getProductReviews`;
+
+content = content.replace(/export const getProductReviews/, newController);
+fs.writeFileSync(file, content);

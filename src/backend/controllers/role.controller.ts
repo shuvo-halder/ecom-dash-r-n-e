@@ -3,6 +3,7 @@ import { prisma } from "../config/db";
 import { AppError } from "../utils/AppError";
 import { AuthRequest } from "../middlewares/auth";
 import { AuditService } from "../services/audit.service";
+import { PermissionService } from "../services/permission.service";
 
 // GET /api/v1/roles
 export const getAllRoles = async (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -79,17 +80,45 @@ export const createRole = async (req: AuthRequest, res: Response, next: NextFunc
       return next(new AppError("Role name is required", 400, "MISSING_FIELDS"));
     }
 
+    if (name.trim().toLowerCase() === "superadmin") {
+      return next(new AppError("Cannot create a role named SuperAdmin", 400, "INVALID_ROLE_NAME"));
+    }
+
     const existingRole = await prisma.role.findFirst({
-      where: { name: { equals: name }, deletedAt: null },
+      where: { name: { equals: name.trim() }, deletedAt: null },
     });
 
     if (existingRole) {
       return next(new AppError("A role with this name already exists", 400, "DUPLICATE_ROLE"));
     }
 
+    // Privilege escalation check: Non-SuperAdmin cannot grant permissions they do not possess
+    if (permissionIds && Array.isArray(permissionIds) && permissionIds.length > 0) {
+      const isAuthorized = await PermissionService.validateUserCanAssignPermissions(
+        req.user!,
+        permissionIds
+      );
+
+      if (!isAuthorized) {
+        await AuditService.logPrivilegeEscalationAttempt(
+          req.user?.id || null,
+          "GRANT_UNHELD_PERMISSIONS_ON_ROLE_CREATE",
+          { roleName: name, requestedPermissionIds: permissionIds },
+          req
+        );
+        return next(
+          new AppError(
+            "Privilege escalation prevented: You cannot grant permissions that you do not possess",
+            403,
+            "PRIVILEGE_ESCALATION_BLOCKED"
+          )
+        );
+      }
+    }
+
     const role = await prisma.role.create({
       data: {
-        name,
+        name: name.trim(),
         description,
         permissions: permissionIds && Array.isArray(permissionIds)
           ? { connect: permissionIds.map((id: string) => ({ id })) }
@@ -130,13 +159,22 @@ export const updateRole = async (req: AuthRequest, res: Response, next: NextFunc
       return next(new AppError("Role not found", 404, "NOT_FOUND"));
     }
 
-    if (role.name === "SuperAdmin" && name && name !== "SuperAdmin") {
-      return next(new AppError("SuperAdmin role name cannot be modified", 403, "SUPERADMIN_PROTECTED"));
+    if (role.name === "SuperAdmin") {
+      if (name && name !== "SuperAdmin") {
+        return next(new AppError("SuperAdmin role name cannot be modified", 403, "SUPERADMIN_PROTECTED"));
+      }
+      if (!PermissionService.isSuperAdmin(req.user)) {
+        return next(new AppError("SuperAdmin role can only be modified by SuperAdmin", 403, "SUPERADMIN_PROTECTED"));
+      }
+    }
+
+    if (name && name.trim().toLowerCase() === "superadmin" && role.name !== "SuperAdmin") {
+      return next(new AppError("Cannot rename a role to SuperAdmin", 400, "INVALID_ROLE_NAME"));
     }
 
     if (name && name.toLowerCase() !== role.name.toLowerCase()) {
       const existing = await prisma.role.findFirst({
-        where: { name: { equals: name }, deletedAt: null, NOT: { id } },
+        where: { name: { equals: name.trim() }, deletedAt: null, NOT: { id } },
       });
       if (existing) {
         return next(new AppError("A role with this name already exists", 400, "DUPLICATE_ROLE"));
@@ -146,7 +184,7 @@ export const updateRole = async (req: AuthRequest, res: Response, next: NextFunc
     const updatedRole = await prisma.role.update({
       where: { id },
       data: {
-        name: name !== undefined ? name : role.name,
+        name: name !== undefined ? name.trim() : role.name,
         description: description !== undefined ? description : role.description,
       },
       include: {
@@ -176,6 +214,11 @@ export const deleteRole = async (req: AuthRequest, res: Response, next: NextFunc
   try {
     const { id } = req.params;
 
+    // Self-role deletion check
+    if (req.user?.roleId === id) {
+      return next(new AppError("You cannot delete your own role", 403, "CANNOT_DELETE_OWN_ROLE"));
+    }
+
     const role = await prisma.role.findFirst({
       where: { id, deletedAt: null },
       include: {
@@ -190,6 +233,12 @@ export const deleteRole = async (req: AuthRequest, res: Response, next: NextFunc
     }
 
     if (role.name === "SuperAdmin") {
+      await AuditService.logPrivilegeEscalationAttempt(
+        req.user?.id || null,
+        "DELETE_SUPERADMIN_ROLE",
+        { roleId: id },
+        req
+      );
       return next(new AppError("SuperAdmin role cannot be deleted", 403, "SUPERADMIN_PROTECTED"));
     }
 

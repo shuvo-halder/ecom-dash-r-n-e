@@ -30,3 +30,8 @@ export const resetCustomerPassword = async (id: string) => {
   const { data } = await api.post(`/customers/${id}/reset-password`);
   return data;
 };
+
+export const updateCustomerMobileStatus = async (id: string, updates: { phone?: string; phoneVerified?: boolean }) => {
+  const { data } = await api.patch(`/customers/${id}/mobile`, updates);
+  return data.data.customer;
+};

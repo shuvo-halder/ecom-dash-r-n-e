@@ -108,7 +108,7 @@ export const seoService = {
       "offers": {
         "@type": "Offer",
         "price": product.price ? Number(product.price).toFixed(2) : "0.00",
-        "priceCurrency": "USD",
+        "priceCurrency": "BDT",
         "availability": `https://schema.org/${availabilityString}`,
         "url": canonicalUrl
       }

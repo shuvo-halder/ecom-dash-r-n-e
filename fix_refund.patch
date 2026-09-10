@@ -1,0 +1,38 @@
+--- src/backend/services/refund.service.ts
++++ src/backend/services/refund.service.ts
+@@ -82,9 +82,14 @@
+         include: { order: true, payment: true },
+       });
+ 
++      const isFullRefund = currentPayment.refundedAmount.add(refund.amount).equals(currentPayment.amount);
++
+       const updatedPayment = await tx.payment.update({
+         where: { id: currentPayment.id },
+         data: {
+           refundedAmount: { increment: refund.amount },
++          status: isFullRefund ? "REFUNDED" : currentPayment.status,
+         },
+       });
+ 
+@@ -98,13 +103,20 @@
+         },
+       });
+ 
+-      const isFullRefund = updatedPayment.refundedAmount.equals(currentPayment.amount);
+       const actionText = isFullRefund ? "REFUNDED" : "PARTIALLY_REFUNDED";
+ 
++      if (isFullRefund) {
++         await tx.order.update({
++            where: { id: refund.orderId },
++            data: { paymentStatus: "Refunded" }
++         });
++      }
++
+       await tx.orderTimeline.create({
+         data: {
+           orderId: refund.orderId,
+-          status: "PROCESSING", 
++          status: refund.order.status,
+           action: actionText,
+         },
+       });

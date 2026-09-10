@@ -16,6 +16,42 @@ interface GetProductsOptions {
 }
 
 export class StorefrontProductService {
+  private async _attachReviewStats(products: StorefrontProduct[]): Promise<StorefrontProduct[]> {
+    if (products.length === 0) return products;
+    
+    const productIds = products.map(p => p.id);
+    const reviewAggregates = await prisma.review.groupBy({
+      by: ['productId', 'rating'],
+      where: { productId: { in: productIds }, status: "APPROVED" },
+      _count: {
+        id: true,
+      }
+    });
+
+    const reviewsStatsByProduct: Record<string, { totalRating: number, count: number }> = {};
+    for (const pid of productIds) {
+      reviewsStatsByProduct[pid] = { totalRating: 0, count: 0 };
+    }
+
+    reviewAggregates.forEach(agg => {
+      const pid = agg.productId;
+      if (reviewsStatsByProduct[pid]) {
+        reviewsStatsByProduct[pid].count += agg._count.id;
+        reviewsStatsByProduct[pid].totalRating += (agg.rating * agg._count.id);
+      }
+    });
+
+    return products.map(product => {
+      const stats = reviewsStatsByProduct[product.id];
+      const rating = stats.count > 0 ? Number((stats.totalRating / stats.count).toFixed(1)) : 0;
+      return {
+        ...product,
+        rating,
+        reviewCount: stats.count
+      };
+    });
+  }
+
   async getProducts(options: GetProductsOptions): Promise<PaginatedResponse<StorefrontProduct>> {
     const page = options.page || 1;
     const limit = options.limit || 20;
@@ -136,9 +172,10 @@ export class StorefrontProductService {
     ]);
 
     const mappedProducts = products.map(mapProductToStorefrontDTO);
+    const mappedWithStats = await this._attachReviewStats(mappedProducts);
 
     return {
-      data: mappedProducts,
+      data: mappedWithStats,
       meta: {
         total,
         page,
@@ -191,7 +228,9 @@ export class StorefrontProductService {
       return null;
     }
 
-    return mapProductToStorefrontDTO(product);
+    const mappedProduct = mapProductToStorefrontDTO(product);
+    const [mappedWithStats] = await this._attachReviewStats([mappedProduct]);
+    return mappedWithStats;
   }
 }
 

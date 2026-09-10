@@ -1,0 +1,4 @@
+ALTER TABLE "Payment" ADD COLUMN "deletedAt" TIMESTAMP(3);
+ALTER TABLE "Refund" ADD COLUMN "deletedAt" TIMESTAMP(3);
+ALTER TABLE "ReturnRequest" ADD COLUMN "deletedAt" TIMESTAMP(3);
+ALTER TABLE "Shipment" ADD COLUMN "deletedAt" TIMESTAMP(3);

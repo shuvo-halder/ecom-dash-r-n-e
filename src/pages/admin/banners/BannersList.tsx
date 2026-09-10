@@ -5,11 +5,14 @@ import { Image, Plus, Trash2, Edit3, Power, CheckCircle2, XCircle, Link, Calenda
 import { Button } from '../../../components/ui/button';
 import { Card } from '../../../components/ui/card';
 import { MediaUploaderInput } from '../../../components/admin/MediaUploaderInput';
+import { ConfirmDialog } from '../../../components/common/ConfirmDialog';
+import { notify } from '../../../lib/notify';
 
 export function BannersList() {
   const queryClient = useQueryClient();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingBanner, setEditingBanner] = useState<Banner | null>(null);
+  const [bannerToDelete, setBannerToDelete] = useState<Banner | null>(null);
 
   const [formData, setFormData] = useState({
     title: '',
@@ -32,26 +35,35 @@ export function BannersList() {
 
   const createMutation = useMutation({
     mutationFn: (data: Partial<Banner>) => bannerService.create(data),
-    onSuccess: () => {
+    onSuccess: (res: any) => {
       queryClient.invalidateQueries({ queryKey: ['banners'] });
       setIsModalOpen(false);
       resetForm();
+      notify.success('Banner Created', `Banner "${res?.title || formData.title}" created.`);
     },
+    onError: (err) => notify.apiError(err, 'Failed to create banner.')
   });
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: Partial<Banner> }) => bannerService.update(id, data),
-    onSuccess: () => {
+    onSuccess: (res: any) => {
       queryClient.invalidateQueries({ queryKey: ['banners'] });
       setIsModalOpen(false);
       setEditingBanner(null);
       resetForm();
+      notify.success('Banner Updated', `Banner "${res?.title || 'Banner'}" updated.`);
     },
+    onError: (err) => notify.apiError(err, 'Failed to update banner.')
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => bannerService.delete(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['banners'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['banners'] });
+      notify.success('Banner Deleted', `Banner "${bannerToDelete?.title || 'Banner'}" was deleted.`);
+      setBannerToDelete(null);
+    },
+    onError: (err) => notify.apiError(err, 'Failed to delete banner.')
   });
 
   const resetForm = () => {
@@ -169,9 +181,7 @@ export function BannersList() {
                         <Button size="icon" variant="ghost" onClick={() => handleEdit(b)}>
                           <Edit3 className="h-4 w-4 text-muted-foreground" />
                         </Button>
-                        <Button size="icon" variant="ghost" onClick={() => {
-                          if (confirm(`Delete banner ${b.title}?`)) deleteMutation.mutate(b.id);
-                        }}>
+                        <Button size="icon" variant="ghost" title="Delete Banner" onClick={() => setBannerToDelete(b)}>
                           <Trash2 className="h-4 w-4 text-rose-500" />
                         </Button>
                       </div>
@@ -290,6 +300,21 @@ export function BannersList() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={!!bannerToDelete}
+        onOpenChange={(open) => !open && setBannerToDelete(null)}
+        title="Delete Banner"
+        description={
+          <>
+            Are you sure you want to delete banner <strong>{bannerToDelete?.title}</strong>?
+          </>
+        }
+        confirmText="Delete Banner"
+        variant="destructive"
+        isLoading={deleteMutation.isPending}
+        onConfirm={() => bannerToDelete && deleteMutation.mutate(bannerToDelete.id)}
+      />
     </div>
   );
 }

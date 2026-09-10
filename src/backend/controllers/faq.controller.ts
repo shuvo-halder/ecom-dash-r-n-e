@@ -1,8 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
-import { PrismaClient } from '@prisma/client';
 import { AppError } from '../utils/AppError';
-
 import { prisma } from "../config/db";
+import { sanitizeRichText } from "../utils/richTextSanitizer";
 
 export const getAll = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -33,8 +32,11 @@ export const getById = async (req: Request, res: Response, next: NextFunction) =
 
 export const create = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const data = { ...req.body };
+    if (data.answer) data.answer = sanitizeRichText(data.answer);
+
     const newItem = await prisma.fAQ.create({
-      data: req.body,
+      data,
       include: { category: true }
     });
     res.status(201).json(newItem);
@@ -46,9 +48,12 @@ export const create = async (req: Request, res: Response, next: NextFunction) =>
 export const update = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
+    const data = { ...req.body };
+    if (data.answer) data.answer = sanitizeRichText(data.answer);
+
     const updated = await prisma.fAQ.update({
       where: { id },
-      data: req.body,
+      data,
       include: { category: true }
     });
     res.json(updated);

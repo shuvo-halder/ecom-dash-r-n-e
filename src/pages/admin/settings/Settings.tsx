@@ -5,12 +5,14 @@ import { Card } from "../../../components/ui/card";
 import { Button } from "../../../components/ui/button";
 import { Input } from "../../../components/ui/input";
 import { LoadingSpinner } from "../../../components/ui/LoadingSpinner";
-import { Save, Eye, Globe, Image, Shield, Truck, Receipt, Mail, BarChart, Check, Palette, RefreshCw } from "lucide-react";
+import { Save, Eye, Globe, Image, Shield, Truck, Receipt, Mail, BarChart, Check, Palette, RefreshCw, Phone, AlertCircle } from "lucide-react";
 import { cn } from "../../../lib/utils";
 import { useBranding } from "../../../context/BrandingContext";
 import { MediaUploaderInput } from "../../../components/admin/MediaUploaderInput";
+import { notify } from "../../../lib/notify";
 
 import { PermissionGuard } from "../../../components/layout/PermissionGuard";
+import { CourierProvidersSection } from "../../../components/admin/settings/CourierProvidersSection";
 
 const TABS = [
   { id: "Branding", label: "Branding", icon: Palette },
@@ -20,6 +22,7 @@ const TABS = [
   { id: "Security", label: "Security", icon: Shield },
   { id: "Shipping", label: "Shipping", icon: Truck },
   { id: "Tax", label: "Tax Rules", icon: Receipt },
+  { id: "Store", label: "Store Contact", icon: Phone },
 ];
 
 export function Settings() {
@@ -28,6 +31,7 @@ export function Settings() {
   const { branding, updateBrandingState, setPageTitle } = useBranding();
   const [formData, setFormData] = useState<any>({});
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   useEffect(() => {
     setPageTitle("Settings - " + activeTab);
@@ -38,6 +42,7 @@ export function Settings() {
     queryFn: async () => {
       const data = await getSettings(activeTab.toLowerCase());
       setFormData(data || {});
+      setValidationError(null);
       return data;
     },
   });
@@ -46,16 +51,22 @@ export function Settings() {
     mutationFn: () => updateSettings(activeTab.toLowerCase(), formData),
     onSuccess: (updatedData) => {
       queryClient.invalidateQueries({ queryKey: ["settings", activeTab.toLowerCase()] });
+      queryClient.invalidateQueries({ queryKey: ["storefront-settings"] });
       if (activeTab === "Branding") {
         updateBrandingState(formData);
       }
       setSaveSuccess(true);
+      notify.success("Settings Saved", `${activeTab} settings updated successfully.`);
       setTimeout(() => setSaveSuccess(false), 3000);
+    },
+    onError: (err) => {
+      notify.apiError(err, `Failed to update ${activeTab} settings.`);
     }
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
+    setValidationError(null);
     if (type === "checkbox") {
       const checked = (e.target as HTMLInputElement).checked;
       setFormData((prev: any) => ({ ...prev, [name]: checked }));
@@ -68,6 +79,45 @@ export function Settings() {
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
+    setValidationError(null);
+
+    // Validation for Shipping
+    if (activeTab === "Shipping") {
+      const inside = Number(formData.insideDhakaCharge ?? 60);
+      const outside = Number(formData.outsideDhakaCharge ?? 120);
+      const threshold = Number(formData.freeShippingThreshold ?? 2000);
+
+      if (isNaN(inside) || inside < 0) {
+        const msg = "Inside Dhaka charge must be a valid non-negative number.";
+        setValidationError(msg);
+        notify.error("Validation Error", msg);
+        return;
+      }
+      if (isNaN(outside) || outside < 0) {
+        const msg = "Outside Dhaka charge must be a valid non-negative number.";
+        setValidationError(msg);
+        notify.error("Validation Error", msg);
+        return;
+      }
+      if (isNaN(threshold) || threshold < 0) {
+        const msg = "Free shipping threshold must be a valid non-negative amount.";
+        setValidationError(msg);
+        notify.error("Validation Error", msg);
+        return;
+      }
+    }
+
+    // Validation for Tax
+    if (activeTab === "Tax") {
+      const rate = Number(formData.defaultTaxRate ?? 0);
+      if (isNaN(rate) || rate < 0 || rate > 100) {
+        const msg = "Default tax rate must be a valid percentage between 0% and 100%.";
+        setValidationError(msg);
+        notify.error("Validation Error", msg);
+        return;
+      }
+    }
+
     mutation.mutate();
   };
 
@@ -206,6 +256,17 @@ export function Settings() {
                         <label className="text-sm font-medium mb-1 block">Site Tagline</label>
                         <Input name="siteTagline" value={formData.siteTagline || ""} onChange={handleChange} placeholder="Enterprise Management Suite" />
                       </div>
+                      <div className="sm:col-span-2">
+                        <label className="text-sm font-medium mb-1 block">Site Description</label>
+                        <textarea
+                          name="siteDescription"
+                          rows={2}
+                          value={formData.siteDescription || ""}
+                          onChange={handleChange}
+                          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                          placeholder="Shop high quality equipment and accessories."
+                        />
+                      </div>
                       <MediaUploaderInput
                         label="Company Logo (Light Theme)"
                         value={formData.logoUrl || ""}
@@ -250,7 +311,7 @@ export function Settings() {
                       </div>
                       <div>
                         <label className="text-sm font-medium mb-1 block">Default Currency</label>
-                        <Input name="defaultCurrency" value={formData.defaultCurrency || "USD"} onChange={handleChange} placeholder="USD" />
+                        <Input name="defaultCurrency" value={formData.defaultCurrency || "BDT"} onChange={handleChange} placeholder="BDT" />
                       </div>
                     </div>
 
@@ -282,6 +343,10 @@ export function Settings() {
                     <div>
                       <label className="text-sm font-medium mb-1 block">Meta Keywords</label>
                       <Input name="metaKeywords" value={formData.metaKeywords || ""} onChange={handleChange} placeholder="ecommerce, store, online shopping" />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium mb-1 block">Canonical Base URL</label>
+                      <Input name="canonicalUrl" value={formData.canonicalUrl || ""} onChange={handleChange} placeholder="https://mystore.com" />
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
@@ -396,19 +461,26 @@ export function Settings() {
                         <Input name="tiktokPixelId" value={formData.tiktokPixelId || ""} onChange={handleChange} placeholder="CXXXXXXXXXXXXXXXXX" />
                       </div>
                       <div>
-                        <label className="text-sm font-medium mb-1 block">Google Ads Conversion ID</label>
+                        <label className="text-sm font-medium mb-1 block">Google Ads ID</label>
                         <Input name="googleAdsId" value={formData.googleAdsId || ""} onChange={handleChange} placeholder="AW-XXXXXXXXX" />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium mb-1 block">Google Ads Conversion ID</label>
+                        <Input name="googleAdsConversionId" value={formData.googleAdsConversionId || ""} onChange={handleChange} placeholder="AW-XXXXXXXXX" />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium mb-1 block">Google Ads Conversion Label</label>
+                        <Input name="googleAdsConversionLabel" value={formData.googleAdsConversionLabel || ""} onChange={handleChange} placeholder="XXXXXXXXXXXXXXXXXXX" />
                       </div>
                       <div>
                         <label className="text-sm font-medium mb-1 block">GA4 API Secret (Measurement Protocol)</label>
                         <Input name="ga4ApiSecret" value={formData.ga4ApiSecret || ""} onChange={handleChange} placeholder="Secret key for server-side events" />
                       </div>
                       <div>
-                        <label className="text-sm font-medium mb-1 block">Hotjar Site ID</label>
-                        <Input name="hotjarId" value={formData.hotjarId || ""} onChange={handleChange} placeholder="987654" />
+                        <label className="text-sm font-medium mb-1 block">Hotjar ID</label>
+                        <Input name="hotjarId" value={formData.hotjarId || ""} onChange={handleChange} placeholder="1234567" />
                       </div>
                     </div>
-
                     <div className="pt-2">
                       <label className="flex items-center gap-2 cursor-pointer text-sm font-medium">
                         <input
@@ -484,36 +556,105 @@ export function Settings() {
 
                 {/* SHIPPING TAB */}
                 {activeTab === "Shipping" && (
-                  <div className="space-y-4">
+                  <div className="space-y-6">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
-                        <label className="text-sm font-medium mb-1 block">Default Shipping Cost ($)</label>
-                        <Input name="defaultShippingCost" type="number" step="0.01" value={formData.defaultShippingCost ?? 0} onChange={handleChange} />
+                        <label className="text-sm font-medium mb-1 block">Inside Dhaka Shipping Charge (BDT)</label>
+                        <Input
+                          name="insideDhakaCharge"
+                          type="number"
+                          step="1"
+                          min="0"
+                          value={formData.insideDhakaCharge ?? 60}
+                          onChange={handleChange}
+                          placeholder="60"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">Standard delivery charge for orders inside Dhaka city.</p>
                       </div>
                       <div>
-                        <label className="text-sm font-medium mb-1 block">Free Shipping Minimum Threshold ($)</label>
-                        <Input name="freeShippingThreshold" type="number" step="0.01" value={formData.freeShippingThreshold || ""} onChange={handleChange} placeholder="99.00" />
+                        <label className="text-sm font-medium mb-1 block">Outside Dhaka Shipping Charge (BDT)</label>
+                        <Input
+                          name="outsideDhakaCharge"
+                          type="number"
+                          step="1"
+                          min="0"
+                          value={formData.outsideDhakaCharge ?? 120}
+                          onChange={handleChange}
+                          placeholder="120"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">Standard delivery charge for orders outside Dhaka.</p>
                       </div>
                     </div>
 
-                    <div className="pt-2">
-                      <label className="flex items-center gap-2 cursor-pointer text-sm font-medium">
-                        <input
-                          type="checkbox"
-                          name="enableFreeShipping"
-                          checked={formData.enableFreeShipping ?? false}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-sm font-medium mb-1 block">Free Shipping Minimum Threshold (BDT)</label>
+                        <Input
+                          name="freeShippingThreshold"
+                          type="number"
+                          step="1"
+                          min="0"
+                          value={formData.freeShippingThreshold ?? 2000}
                           onChange={handleChange}
-                          className="rounded border-input text-primary focus:ring-primary"
+                          placeholder="2000"
                         />
-                        Enable Free Shipping Rule Above Threshold
-                      </label>
+                        <p className="text-xs text-muted-foreground mt-1">Cart subtotal amount required to waive shipping charges.</p>
+                      </div>
+                      <div className="flex flex-col justify-end">
+                        <label className="flex items-center gap-2 cursor-pointer text-sm font-medium p-2.5 rounded-lg border bg-slate-50 dark:bg-slate-900">
+                          <input
+                            type="checkbox"
+                            name="freeShippingEnabled"
+                            checked={formData.freeShippingEnabled ?? formData.enableFreeShipping ?? true}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              setFormData((prev: any) => ({
+                                ...prev,
+                                freeShippingEnabled: checked,
+                                enableFreeShipping: checked,
+                              }));
+                            }}
+                            className="rounded border-input text-primary focus:ring-primary h-4 w-4"
+                          />
+                          <div>
+                            <span className="block font-medium">Enable Free Shipping Rule</span>
+                            <span className="text-xs text-muted-foreground font-normal">Apply free shipping automatically when subtotal reaches the threshold</span>
+                          </div>
+                        </label>
+                      </div>
                     </div>
+
+                    {/* Courier Providers Management Section */}
+                    <CourierProvidersSection />
                   </div>
                 )}
 
                 {/* TAX TAB */}
                 {activeTab === "Tax" && (
                   <div className="space-y-4">
+                    <div className="p-3 border rounded-md bg-muted/30">
+                      <label className="flex items-center gap-2 cursor-pointer text-sm font-medium">
+                        <input
+                          type="checkbox"
+                          name="taxEnabled"
+                          checked={formData.taxEnabled ?? formData.enableTax ?? true}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            setFormData((prev: any) => ({
+                              ...prev,
+                              taxEnabled: checked,
+                              enableTax: checked,
+                            }));
+                          }}
+                          className="rounded border-input text-primary focus:ring-primary h-4 w-4"
+                        />
+                        <div>
+                          <span className="block font-medium">Enable Sales Tax Calculation</span>
+                          <span className="text-xs text-muted-foreground font-normal">Automatically calculate and apply tax during checkout based on the configured rate</span>
+                        </div>
+                      </label>
+                    </div>
+
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className="text-sm font-medium mb-1 block">Default Tax Rate (%)</label>
@@ -528,11 +669,91 @@ export function Settings() {
                           name="pricesIncludeTax"
                           checked={formData.pricesIncludeTax ?? false}
                           onChange={handleChange}
-                          className="rounded border-input text-primary focus:ring-primary"
+                          className="rounded border-input text-primary focus:ring-primary h-4 w-4"
                         />
                         Catalog Prices Already Include Sales Tax
                       </label>
                     </div>
+                  </div>
+                )}
+
+                
+                {/* STORE CONTACT TAB */}
+                {activeTab === "Store" && (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-sm font-medium mb-1 block">Support Email Address</label>
+                        <Input name="supportEmail" type="email" value={formData.supportEmail || ""} onChange={handleChange} placeholder="support@mystore.com" />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium mb-1 block">Support Phone Number</label>
+                        <Input name="supportPhone" type="text" value={formData.supportPhone || ""} onChange={handleChange} placeholder="+8801812345678" />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium mb-1 block">WhatsApp Order Number</label>
+                        <Input name="whatsappOrderNumber" type="text" value={formData.whatsappOrderNumber || ""} onChange={handleChange} placeholder="+8801712345678" />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium mb-1 block">Call For Order Number</label>
+                        <Input name="callOrderNumber" type="text" value={formData.callOrderNumber || ""} onChange={handleChange} placeholder="+8801812345678" />
+                      </div>
+                    </div>
+
+                    <div className="pt-2 border-t">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">Merchant Address & Location</h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-3">
+                        <div className="sm:col-span-3">
+                          <label className="text-sm font-medium mb-1 block">Street Address</label>
+                          <Input name="address" type="text" value={formData.address || ""} onChange={handleChange} placeholder="House 12, Road 5, Block B, Banani" />
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium mb-1 block">City</label>
+                          <Input name="city" type="text" value={formData.city || ""} onChange={handleChange} placeholder="Dhaka" />
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium mb-1 block">Country</label>
+                          <Input name="country" type="text" value={formData.country || ""} onChange={handleChange} placeholder="Bangladesh" />
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium mb-1 block">Google Maps Location URL</label>
+                          <Input name="location" type="url" value={formData.location || ""} onChange={handleChange} placeholder="https://maps.google.com/..." />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-2 border-t">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">Social Media Profiles</h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-sm font-medium mb-1 block">Facebook Page URL</label>
+                          <Input name="facebookUrl" type="url" value={formData.facebookUrl || ""} onChange={handleChange} placeholder="https://facebook.com/mystore" />
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium mb-1 block">Instagram Profile URL</label>
+                          <Input name="instagramUrl" type="url" value={formData.instagramUrl || ""} onChange={handleChange} placeholder="https://instagram.com/mystore" />
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium mb-1 block">YouTube Channel URL</label>
+                          <Input name="youtubeUrl" type="url" value={formData.youtubeUrl || ""} onChange={handleChange} placeholder="https://youtube.com/@mystore" />
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium mb-1 block">TikTok Profile URL</label>
+                          <Input name="tiktokUrl" type="url" value={formData.tiktokUrl || ""} onChange={handleChange} placeholder="https://tiktok.com/@mystore" />
+                        </div>
+                        <div className="sm:col-span-2">
+                          <label className="text-sm font-medium mb-1 block">LinkedIn Page URL</label>
+                          <Input name="linkedinUrl" type="url" value={formData.linkedinUrl || ""} onChange={handleChange} placeholder="https://linkedin.com/company/mystore" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {validationError && (
+                  <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-md flex items-center gap-2 text-sm text-destructive">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>{validationError}</span>
                   </div>
                 )}
 

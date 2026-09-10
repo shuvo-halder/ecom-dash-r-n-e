@@ -3,6 +3,8 @@ import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
 import { Card, CardContent } from '../../../components/ui/card';
 import { Globe, FileText, ArrowLeft, Eye } from 'lucide-react';
+import { RichTextEditor } from '@/src/components/ui/RichTextEditor';
+import DOMPurify from 'dompurify';
 
 interface CmsPageFormProps {
   initialData?: any;
@@ -151,21 +153,18 @@ export function CmsPageForm({ initialData, onSubmit, isLoading }: CmsPageFormPro
                 {previewMode ? (
                   <div className="min-h-[350px] p-4 rounded-md border border-input bg-muted/30 overflow-y-auto prose dark:prose-invert max-w-none">
                     {formData.content ? (
-                      <div className="whitespace-pre-wrap">{formData.content}</div>
+                      <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(formData.content) }} />
                     ) : (
                       <span className="text-muted-foreground italic">No content written yet.</span>
                     )}
                   </div>
                 ) : (
-                  <textarea
-                    id="page-content-input"
-                    name="content"
+                  <RichTextEditor
                     value={formData.content}
-                    onChange={handleChange}
-                    rows={15}
+                    onChange={(val) => setFormData((prev) => ({ ...prev, content: val }))}
                     placeholder="Write page content in HTML or plain text..."
-                    className="flex min-h-[350px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    required
+                    minHeight="350px"
+                    folder="cms"
                   />
                 )}
               </div>

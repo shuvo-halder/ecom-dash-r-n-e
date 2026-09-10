@@ -5,11 +5,14 @@ import { StorefrontNotificationService } from "../../services/storefront/notific
 export const getNotifications = async (req: CustomerAuthRequest, res: Response, next: NextFunction) => {
   try {
     const customerId = req.customer!.id;
-    const { page, limit } = req.query;
+    const { page, limit, unreadOnly } = req.query;
+
+    const isUnreadOnly = unreadOnly === "true" || unreadOnly === "1" || (unreadOnly as unknown) === true;
     
     const result = await StorefrontNotificationService.getNotifications(customerId, {
-      page: page ? parseInt(page as string) : undefined,
-      limit: limit ? parseInt(limit as string) : undefined
+      page: page ? parseInt(page as string, 10) : undefined,
+      limit: limit ? parseInt(limit as string, 10) : undefined,
+      unreadOnly: isUnreadOnly,
     });
 
     res.status(200).json({ status: "success", data: result });

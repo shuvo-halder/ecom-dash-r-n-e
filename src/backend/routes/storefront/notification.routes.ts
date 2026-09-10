@@ -8,7 +8,9 @@ const router = express.Router();
 router.use(requireCustomerAuth);
 router.get("/", getNotifications);
 router.get("/unread-count", getUnreadCount);
+router.patch("/read-all", markAllAsRead);
 router.post("/read-all", markAllAsRead);
+router.patch("/:id/read", validateParamsUUID(["id"]), markAsRead);
 router.post("/:id/read", validateParamsUUID(["id"]), markAsRead);
 
 export default router;

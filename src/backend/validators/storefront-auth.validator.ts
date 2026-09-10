@@ -28,3 +28,20 @@ export const customerResetPasswordSchema = z.object({
   token: z.string().min(1, "Token is required"),
   newPassword: customerStrongPasswordSchema,
 });
+
+export const customerMobileRegisterSchema = z.object({
+  firstName: z.string().min(1, "First name is required"),
+  lastName: z.string().optional(),
+  phone: z.string().min(1, "Phone is required"),
+});
+
+export const customerMobileVerifySchema = z.object({
+  phone: z.string().min(1, "Phone is required"),
+  otp: z.string().length(6, "OTP must be 6 digits"),
+  firstName: z.string().optional(),
+  lastName: z.string().optional(),
+});
+
+export const customerMobileLoginSchema = z.object({
+  phone: z.string().min(1, "Phone is required"),
+});

@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { asyncHandler } from "../utils/asyncHandler";
 import { prisma } from "../config/db";
 import { AppError } from "../utils/AppError";
+import { sanitizeRichText } from "../utils/richTextSanitizer";
 
 const generateSlug = (name: string) => {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, "");
@@ -43,7 +44,7 @@ export const createBrand = asyncHandler(async (req: Request, res: Response) => {
       slug,
       logoUrl,
       website,
-      description,
+      description: description ? sanitizeRichText(description) : description,
       isActive: isActive !== undefined ? isActive : true,
     },
   });
@@ -68,7 +69,7 @@ export const updateBrand = asyncHandler(async (req: Request, res: Response) => {
       ...(name && name !== existingBrand.name && { slug: generateSlug(name) + "-" + Math.random().toString(36).substring(2, 6) }),
       logoUrl,
       website,
-      description,
+      description: description !== undefined ? (description ? sanitizeRichText(description) : description) : undefined,
       isActive: isActive !== undefined ? isActive : existingBrand.isActive,
     },
   });

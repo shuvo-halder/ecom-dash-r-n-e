@@ -1,6 +1,8 @@
+import path from 'path';
 import { cloudinary, isCloudinaryConfigured } from '../config/cloudinary';
 import { prisma } from '../config/db';
 import { AppError } from '../utils/AppError';
+import { MediaUsageService } from './media-usage.service';
 
 export interface UploadFileOptions {
   folder?: string;
@@ -65,6 +67,68 @@ export class MediaService {
   }
 
   /**
+   * Strict validation for rich-text editor image files
+   * Rejects SVG, executables, scripts, etc.
+   */
+  static validateRichTextImage(file: Express.Multer.File) {
+    if (!file) {
+      throw new AppError('No image file provided for upload', 400, 'BAD_REQUEST');
+    }
+
+    const ALLOWED_RICH_TEXT_MIMES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
+    const ALLOWED_RICH_TEXT_EXTS = ['.jpg', '.jpeg', '.png', '.webp', '.gif'];
+
+    const mime = file.mimetype ? file.mimetype.toLowerCase() : '';
+    if (!ALLOWED_RICH_TEXT_MIMES.includes(mime)) {
+      throw new AppError(
+        `Invalid image format (${file.mimetype || 'unknown'}). Allowed formats: JPG, JPEG, PNG, WEBP, GIF`,
+        400,
+        'INVALID_FILE_TYPE'
+      );
+    }
+
+    const ext = path.extname(file.originalname || '').toLowerCase();
+    if (!ext || !ALLOWED_RICH_TEXT_EXTS.includes(ext)) {
+      throw new AppError(
+        `Invalid file extension (${ext || 'none'}). Allowed extensions: .jpg, .jpeg, .png, .webp, .gif`,
+        400,
+        'INVALID_FILE_EXTENSION'
+      );
+    }
+
+    if (file.size > MAX_FILE_SIZE) {
+      throw new AppError(
+        `File size exceeds 10MB limit (Current size: ${(file.size / (1024 * 1024)).toFixed(2)}MB)`,
+        400,
+        'FILE_TOO_LARGE'
+      );
+    }
+  }
+
+  /**
+   * Upload image specifically for Rich Text Editor
+   */
+  static async uploadRichTextImage(
+    file: Express.Multer.File,
+    options: UploadFileOptions = {}
+  ): Promise<UploadedMediaResult> {
+    this.validateRichTextImage(file);
+
+    let rawFolder = options.folder || 'rich-text';
+    let folder = rawFolder.replace(/[^a-zA-Z0-9_\/-]/g, '').replace(/\/+/g, '/');
+    if (!folder.startsWith('rich-text')) {
+      folder = `rich-text/${folder}`.replace(/\/+/g, '/');
+    }
+
+    return this.uploadSingle(file, {
+      ...options,
+      folder,
+      altText: options.altText || file.originalname,
+      entityType: 'mediaAsset',
+    });
+  }
+
+  /**
    * Upload buffer or base64 to Cloudinary or fallback storage
    */
   static async uploadToStorage(
@@ -126,99 +190,118 @@ export class MediaService {
     const folder = options.folder || 'media';
     const uploadRes = await this.uploadToStorage(file, folder);
 
-    const mediaAsset = await prisma.mediaAsset.create({
-      data: {
-        filename: `${Date.now()}_${file.originalname}`,
-        originalName: file.originalname,
-        originalFilename: file.originalname,
-        mimeType: file.mimetype,
-        size: file.size,
-        url: uploadRes.secureUrl,
-        secureUrl: uploadRes.secureUrl,
-        publicId: uploadRes.publicId,
-        cloudinaryPublicId: uploadRes.publicId,
-        width: uploadRes.width || null,
-        height: uploadRes.height || null,
-        folder,
-        altText: options.altText || file.originalname,
-        isPrimary: options.isPrimary ?? false,
-        sortOrder: options.sortOrder ?? 0,
-      },
-    });
+    let mediaAsset: any = null;
+    try {
+      mediaAsset = await prisma.mediaAsset.create({
+        data: {
+          filename: `${Date.now()}_${file.originalname}`,
+          originalName: file.originalname,
+          originalFilename: file.originalname,
+          mimeType: file.mimetype,
+          size: file.size,
+          url: uploadRes.secureUrl,
+          secureUrl: uploadRes.secureUrl,
+          publicId: uploadRes.publicId,
+          cloudinaryPublicId: uploadRes.publicId,
+          width: uploadRes.width || null,
+          height: uploadRes.height || null,
+          folder,
+          altText: options.altText || file.originalname,
+          isPrimary: options.isPrimary ?? false,
+          sortOrder: options.sortOrder ?? 0,
+        },
+      });
 
-    if (options.entityType && options.entityId) {
-      if (options.entityType === 'product') {
-        await prisma.productImage.create({
-          data: {
-            productId: options.entityId,
-            imageUrl: uploadRes.secureUrl,
-            url: uploadRes.secureUrl,
-            secureUrl: uploadRes.secureUrl,
-            publicId: uploadRes.publicId,
-            cloudinaryPublicId: uploadRes.publicId,
-            originalFilename: file.originalname,
-            mimeType: file.mimetype,
-            size: file.size,
-            width: uploadRes.width,
-            height: uploadRes.height,
-            folder,
-            altText: options.altText || file.originalname,
-            isPrimary: options.isPrimary ?? false,
-            sortOrder: options.sortOrder ?? 0,
-          },
-        });
-      } else if (options.entityType === 'category') {
-        await prisma.categoryImage.create({
-          data: {
-            categoryId: options.entityId,
-            secureUrl: uploadRes.secureUrl,
-            cloudinaryPublicId: uploadRes.publicId,
-            originalFilename: file.originalname,
-            mimeType: file.mimetype,
-            size: file.size,
-            width: uploadRes.width,
-            height: uploadRes.height,
-            folder,
-            altText: options.altText || file.originalname,
-            isPrimary: options.isPrimary ?? false,
-            sortOrder: options.sortOrder ?? 0,
-          },
-        });
-      } else if (options.entityType === 'brand') {
-        await prisma.brandImage.create({
-          data: {
-            brandId: options.entityId,
-            secureUrl: uploadRes.secureUrl,
-            cloudinaryPublicId: uploadRes.publicId,
-            originalFilename: file.originalname,
-            mimeType: file.mimetype,
-            size: file.size,
-            width: uploadRes.width,
-            height: uploadRes.height,
-            folder,
-            altText: options.altText || file.originalname,
-            isPrimary: options.isPrimary ?? false,
-            sortOrder: options.sortOrder ?? 0,
-          },
-        });
+      if (options.entityType && options.entityId && mediaAsset) {
+        if (options.entityType === 'product') {
+          await prisma.productImage.create({
+            data: {
+              productId: options.entityId,
+              imageUrl: uploadRes.secureUrl,
+              url: uploadRes.secureUrl,
+              secureUrl: uploadRes.secureUrl,
+              publicId: uploadRes.publicId,
+              cloudinaryPublicId: uploadRes.publicId,
+              originalFilename: file.originalname,
+              mimeType: file.mimetype,
+              size: file.size,
+              width: uploadRes.width,
+              height: uploadRes.height,
+              folder,
+              altText: options.altText || file.originalname,
+              isPrimary: options.isPrimary ?? false,
+              sortOrder: options.sortOrder ?? 0,
+            },
+          });
+        } else if (options.entityType === 'category') {
+          await prisma.categoryImage.create({
+            data: {
+              categoryId: options.entityId,
+              secureUrl: uploadRes.secureUrl,
+              cloudinaryPublicId: uploadRes.publicId,
+              originalFilename: file.originalname,
+              mimeType: file.mimetype,
+              size: file.size,
+              width: uploadRes.width,
+              height: uploadRes.height,
+              folder,
+              altText: options.altText || file.originalname,
+              isPrimary: options.isPrimary ?? false,
+              sortOrder: options.sortOrder ?? 0,
+            },
+          });
+        } else if (options.entityType === 'brand') {
+          await prisma.brandImage.create({
+            data: {
+              brandId: options.entityId,
+              secureUrl: uploadRes.secureUrl,
+              cloudinaryPublicId: uploadRes.publicId,
+              originalFilename: file.originalname,
+              mimeType: file.mimetype,
+              size: file.size,
+              width: uploadRes.width,
+              height: uploadRes.height,
+              folder,
+              altText: options.altText || file.originalname,
+              isPrimary: options.isPrimary ?? false,
+              sortOrder: options.sortOrder ?? 0,
+            },
+          });
+        }
       }
+    } catch (dbErr: any) {
+      console.error(`[MediaService] Database record creation failed:`, dbErr.message);
+      
+      // Attempt to clean up orphaned Cloudinary asset
+      // Limitation: True distributed rollback is impossible. If this cleanup request fails, 
+      // or the process crashes here, the Cloudinary asset will remain orphaned.
+      if (uploadRes.publicId && !uploadRes.publicId.startsWith('local_') && isCloudinaryConfigured()) {
+        try {
+          await cloudinary.uploader.destroy(uploadRes.publicId);
+          console.log(`[MediaService] Successfully cleaned up orphaned Cloudinary asset: ${uploadRes.publicId}`);
+        } catch (cleanupErr: any) {
+          console.error(`[MediaService] FAILED to clean up orphaned Cloudinary asset ${uploadRes.publicId}:`, cleanupErr.message);
+        }
+      }
+      
+      throw new AppError(`Failed to save media record to database. ${dbErr.message}`, 500, 'DATABASE_ERROR');
     }
 
     return {
-      id: mediaAsset.id,
-      url: mediaAsset.url,
-      secureUrl: mediaAsset.secureUrl || mediaAsset.url,
-      cloudinaryPublicId: mediaAsset.cloudinaryPublicId,
-      publicId: mediaAsset.publicId,
-      originalFilename: mediaAsset.originalFilename || mediaAsset.filename,
-      mimeType: mediaAsset.mimeType,
-      size: mediaAsset.size,
-      width: mediaAsset.width,
-      height: mediaAsset.height,
-      folder: mediaAsset.folder || 'media',
-      altText: mediaAsset.altText,
-      isPrimary: mediaAsset.isPrimary,
-      sortOrder: mediaAsset.sortOrder,
+      id: mediaAsset?.id || `asset_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      url: mediaAsset?.url || uploadRes.secureUrl,
+      secureUrl: mediaAsset?.secureUrl || uploadRes.secureUrl,
+      cloudinaryPublicId: mediaAsset?.cloudinaryPublicId || uploadRes.publicId,
+      publicId: mediaAsset?.publicId || uploadRes.publicId,
+      originalFilename: mediaAsset?.originalFilename || file.originalname,
+      mimeType: mediaAsset?.mimeType || file.mimetype,
+      size: mediaAsset?.size || file.size,
+      width: mediaAsset?.width ?? uploadRes.width ?? null,
+      height: mediaAsset?.height ?? uploadRes.height ?? null,
+      folder: mediaAsset?.folder || folder,
+      altText: mediaAsset?.altText || options.altText || file.originalname,
+      isPrimary: mediaAsset?.isPrimary ?? options.isPrimary ?? false,
+      sortOrder: mediaAsset?.sortOrder ?? options.sortOrder ?? 0,
     };
   }
 
@@ -264,8 +347,21 @@ export class MediaService {
       },
     });
 
+    // 1. Safe Media Usage Detection: Check if asset is referenced anywhere across DB
+    const usage = await MediaUsageService.checkAssetUsage(assetOrPublicId, asset || undefined);
+    if (usage.used) {
+      throw new AppError(
+        'This media asset is currently in use and cannot be deleted.',
+        400,
+        'MEDIA_ASSET_IN_USE',
+        true,
+        usage
+      );
+    }
+
     const publicId = asset?.cloudinaryPublicId || asset?.publicId || assetOrPublicId;
 
+    // 2. Destroy Cloudinary file ONLY AFTER confirming asset is completely unused
     if (publicId && !publicId.startsWith('local_') && isCloudinaryConfigured()) {
       try {
         await cloudinary.uploader.destroy(publicId);
@@ -301,6 +397,53 @@ export class MediaService {
     }
 
     return true;
+  }
+
+  /**
+   * Batch delete multiple media assets safely
+   */
+  static async batchDeleteAssets(ids: string[]): Promise<{
+    deletedCount: number;
+    deletedIds: string[];
+    blockedCount: number;
+    blocked: Array<{ id: string; reason: string; usage: any }>;
+  }> {
+    const deletedIds: string[] = [];
+    const blocked: Array<{ id: string; reason: string; usage: any }> = [];
+
+    for (const id of ids) {
+      const usage = await MediaUsageService.checkAssetUsage(id);
+      if (usage.used) {
+        blocked.push({
+          id,
+          reason: 'This media asset is currently in use and cannot be deleted.',
+          usage,
+        });
+        continue;
+      }
+
+      try {
+        await this.deleteAsset(id);
+        deletedIds.push(id);
+      } catch (err: any) {
+        if (err?.code === 'MEDIA_ASSET_IN_USE') {
+          blocked.push({
+            id,
+            reason: err.message,
+            usage: err.details,
+          });
+        } else {
+          throw err;
+        }
+      }
+    }
+
+    return {
+      deletedCount: deletedIds.length,
+      deletedIds,
+      blockedCount: blocked.length,
+      blocked,
+    };
   }
 
   /**

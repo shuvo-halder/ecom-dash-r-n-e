@@ -3,8 +3,9 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { BrandForm } from './BrandForm';
 import { getBrandById, updateBrand } from '../../services/brand.service';
-import { ArrowLeft } from 'lucide-react';
+ import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/src/components/ui/button';
+import { notify } from '@/src/lib/notify';
 
 export function BrandEdit() {
   const { id } = useParams<{ id: string }>();
@@ -19,19 +20,19 @@ export function BrandEdit() {
 
   const mutation = useMutation({
     mutationFn: (data: any) => updateBrand(id!, data),
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['brands'] });
       queryClient.invalidateQueries({ queryKey: ['brand', id] });
+      notify.success('Brand Updated', `Changes to "${data?.name || brand?.name || 'Brand'}" were saved successfully.`);
       navigate('/brands');
     },
     onError: (error: any) => {
-      console.error('Failed to update brand', error);
-      alert(error.response?.data?.error?.message || 'Failed to update brand');
+      notify.apiError(error, 'Failed to update brand.');
     }
   });
 
   if (isLoading) {
-    return <div className="p-8 text-center text-muted-foreground">Loading...</div>;
+    return <div className="p-8 text-center text-muted-foreground">Loading brand details...</div>;
   }
 
   if (!brand) {
@@ -51,3 +52,4 @@ export function BrandEdit() {
     </div>
   );
 }
+

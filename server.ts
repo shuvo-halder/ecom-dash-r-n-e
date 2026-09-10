@@ -15,6 +15,7 @@ import { swaggerSpec } from "./src/backend/config/swagger";
 import authRouter from "./src/backend/routes/auth.routes";
 import notificationRouter from "./src/backend/routes/notification.routes";
 import analyticsRouter from "./src/backend/routes/analytics.routes";
+import dashboardRouter from "./src/backend/routes/dashboard.routes";
 import productRouter from "./src/backend/routes/product.routes";
 import categoryRouter from "./src/backend/routes/category.routes";
 import brandRouter from "./src/backend/routes/brand.routes";
@@ -28,6 +29,7 @@ import permissionRouter from "./src/backend/routes/permission.routes";
 import auditRouter from "./src/backend/routes/audit.routes";
 import sessionRouter from "./src/backend/routes/session.routes";
 import shipmentRouter from "./src/backend/routes/shipment.routes";
+import pathaoRouter from "./src/backend/routes/pathao.routes";
 import returnRouter from "./src/backend/routes/return.routes";
 import refundRouter from "./src/backend/routes/refund.routes";
 import paymentRouter from "./src/backend/routes/payment.routes";
@@ -43,9 +45,13 @@ import popupRouter from "./src/backend/routes/popup.routes";
 import pageRouter from "./src/backend/routes/page.routes";
 import landingPageRouter from "./src/backend/routes/landing-page.routes";
 import blogRouter from "./src/backend/routes/blog.routes";
-import mediaRouter from "./src/backend/routes/media.routes";
+import mediaRouter, { richTextUpload, richTextUploadMiddleware } from "./src/backend/routes/media.routes";
+import { MediaController } from "./src/backend/controllers/media.controller";
+import { requireAuth, requirePermission } from "./src/backend/middlewares/auth";
 import faqRouter from "./src/backend/routes/faq.routes";
+import archiveRouter from "./src/backend/routes/archive.routes";
 import settingRouter from "./src/backend/routes/setting.routes";
+import courierRouter from "./src/backend/routes/courier.routes";
 import seoRouter from "./src/backend/routes/seo.routes";
 
 import storefrontProductRouter from "./src/backend/routes/storefront/product.routes";
@@ -56,6 +62,8 @@ import storefrontMerchantRouter from "./src/backend/routes/storefront/merchant.r
 import storefrontSettingRouter from "./src/backend/routes/storefront/setting.routes";
 import storefrontAnalyticsRouter from "./src/backend/routes/storefront/analytics.routes";
 import storefrontSeoRouter from "./src/backend/routes/storefront/seo.routes";
+import storefrontReviewRouter from "./src/backend/routes/storefront/review.routes";
+import reviewRouter from "./src/backend/routes/review.routes";
 import { getSitemap, getRobotsTxt } from "./src/backend/controllers/storefront/sitemap.controller";
 import storefrontPageRouter from "./src/backend/routes/storefront/page.routes";
 import storefrontBlogRouter from "./src/backend/routes/storefront/blog.routes";
@@ -84,6 +92,8 @@ import { responseFormatter } from "./src/backend/middlewares/storefront/response
 import { globalLimiter } from "./src/backend/middlewares/rateLimiter";
 import { sanitizeMiddleware } from "./src/backend/middlewares/validation";
 import { startRefreshTokenCleanupJob } from "./src/backend/controllers/auth.controller";
+import { UploadCleanupService } from "./src/backend/services/upload-cleanup.service";
+import { PathaoStatusSyncService } from "./src/backend/integrations/pathao/pathao-sync.service";
 
 import { ProductMediaService } from "./src/backend/services/product-media.service";
 
@@ -94,8 +104,10 @@ async function startServer() {
   // Enable trust proxy for reverse proxies (Apache HTTP Server, Next.js, PM2)
   app.set("trust proxy", process.env.TRUST_PROXY || ["loopback", "linklocal", "uniquelocal"]);
 
-  // Start automatic refresh token cleanup job (Part 7)
+  // Start automatic background jobs
   startRefreshTokenCleanupJob();
+  UploadCleanupService.startCleanupJob();
+  PathaoStatusSyncService.startPollingJob();
 
   // Part 1 & 10 - Enterprise-grade Helmet security headers config
   app.use(helmet({
@@ -174,7 +186,13 @@ async function startServer() {
     ],
   }));
 
-  app.use(express.json());
+  app.use(
+    express.json({
+      verify: (req: any, res, buf) => {
+        req.rawBody = buf;
+      },
+    })
+  );
   app.use(express.urlencoded({ extended: true }));
 
   // API Routes
@@ -193,6 +211,7 @@ async function startServer() {
   
   // Mount routes
   apiRouter.use("/auth", authRouter);
+  apiRouter.use("/dashboard", dashboardRouter);
   apiRouter.use("/analytics", analyticsRouter);
   apiRouter.use("/notifications", notificationRouter);
   apiRouter.use("/products", productRouter);
@@ -209,6 +228,8 @@ async function startServer() {
   apiRouter.use("/sessions", sessionRouter);
   apiRouter.use("/orders", orderRouter);
   apiRouter.use("/shipments", shipmentRouter);
+  apiRouter.use("/courier", courierRouter);
+  apiRouter.use("/pathao", pathaoRouter);
   apiRouter.use("/returns", returnRouter);
   apiRouter.use("/refunds", refundRouter);
   apiRouter.use("/payments", paymentRouter);
@@ -224,8 +245,17 @@ async function startServer() {
   apiRouter.use("/landing-pages", landingPageRouter);
   apiRouter.use("/blog", blogRouter);
   apiRouter.use("/media", mediaRouter);
+  apiRouter.post(
+    "/uploads/rich-text-image",
+    requireAuth,
+    requirePermission("Media", "Write"),
+    richTextUploadMiddleware,
+    MediaController.uploadRichTextImage
+  );
   apiRouter.use("/faqs", faqRouter);
   apiRouter.use("/seo", seoRouter);
+  apiRouter.use("/reviews", reviewRouter);
+  apiRouter.use("/archive", archiveRouter);
   apiRouter.use("/settings", settingRouter);
   apiRouter.use("/storefront/v1/settings", storefrontSettingRouter);
   
@@ -252,6 +282,7 @@ storefrontRouter.use("/banners", storefrontBannerRouter);
   storefrontRouter.use("/search", storefrontSearchRouter);
   storefrontRouter.use("/merchant", storefrontMerchantRouter);
   storefrontRouter.use("/seo", storefrontSeoRouter);
+  storefrontRouter.use("/reviews", storefrontReviewRouter);
   storefrontRouter.use("/settings", storefrontSettingRouter);
   storefrontRouter.use("/analytics", storefrontAnalyticsRouter);
   storefrontRouter.use("/pages", storefrontPageRouter);
@@ -262,8 +293,11 @@ storefrontRouter.use("/banners", storefrontBannerRouter);
   storefrontRouter.use("/activity", storefrontActivityRouter);
   storefrontRouter.use("/notifications", storefrontNotificationRouter);
   storefrontRouter.use("/account", storefrontAccountRouter);
+  storefrontRouter.use("/customer", storefrontAccountRouter);
   storefrontRouter.use("/wishlist", storefrontWishlistRouter);
   storefrontRouter.use("/orders", storefrontOrderRouter);
+  storefrontRouter.use("/customer/orders", storefrontOrderRouter);
+  storefrontRouter.use("/account/orders", storefrontOrderRouter);
   storefrontRouter.use("/cart", storefrontCartRouter);
   storefrontRouter.use("/checkout", storefrontCheckoutRouter);
   storefrontRouter.use("/payment", storefrontPaymentRouter);

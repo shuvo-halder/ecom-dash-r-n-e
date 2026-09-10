@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
@@ -10,11 +10,14 @@ import { Plus, MoreHorizontal, Edit, Trash2, FolderTree, Folder } from 'lucide-r
 import { getCategories, deleteCategory } from '../../services/category.service';
 import { PermissionGuard } from '../../components/layout/PermissionGuard';
 import { useAuth } from '../../context/AuthContext';
+import { ConfirmDialog } from '../../components/common/ConfirmDialog';
+import { notify } from '../../lib/notify';
 
 export function CategoryList() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { hasPermission } = useAuth();
+  const [categoryToDelete, setCategoryToDelete] = useState<{ id: string; name: string } | null>(null);
   
   // Fetch as tree for hierarchical display
   const { data: categories = [], isLoading } = useQuery({
@@ -26,15 +29,17 @@ export function CategoryList() {
     mutationFn: deleteCategory,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['categories'] });
+      notify.success('Category Deleted', `"${categoryToDelete?.name || 'Category'}" and subcategories were removed.`);
+      setCategoryToDelete(null);
     },
     onError: (err: any) => {
-      alert(err.response?.data?.error?.message || 'Failed to delete category');
+      notify.apiError(err, 'Failed to delete category.');
     }
   });
 
-  const handleDelete = (id: string) => {
-    if (window.confirm('Are you sure you want to delete this category?')) {
-      deleteMutation.mutate(id);
+  const handleConfirmDelete = () => {
+    if (categoryToDelete) {
+      deleteMutation.mutate(categoryToDelete.id);
     }
   };
 
@@ -67,7 +72,7 @@ export function CategoryList() {
             {showActions && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon">
+                  <Button variant="ghost" size="icon" aria-label={`Actions for ${category.name}`}>
                     <MoreHorizontal className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
@@ -80,7 +85,7 @@ export function CategoryList() {
                   )}
                   {hasDelete && (
                     <DropdownMenuItem 
-                      onClick={() => handleDelete(category.id)}
+                      onClick={() => setCategoryToDelete({ id: category.id, name: category.name })}
                       className="text-destructive focus:bg-destructive focus:text-destructive-foreground"
                     >
                       <Trash2 className="mr-2 h-4 w-4" />
@@ -143,6 +148,22 @@ export function CategoryList() {
           </Table>
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        isOpen={!!categoryToDelete}
+        onOpenChange={(open) => !open && setCategoryToDelete(null)}
+        title="Delete Category"
+        description={
+          <>
+            Are you sure you want to delete category <strong>{categoryToDelete?.name}</strong>? Any nested subcategories and product assignments will be affected.
+          </>
+        }
+        confirmText="Delete Category"
+        variant="destructive"
+        isLoading={deleteMutation.isPending}
+        onConfirm={handleConfirmDelete}
+      />
     </div>
   );
 }
+

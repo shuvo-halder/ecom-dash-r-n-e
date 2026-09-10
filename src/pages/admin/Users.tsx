@@ -1,119 +1,215 @@
-import React, { useState, useEffect } from "react";
-import { LoadingSpinner } from "../../components/ui/LoadingSpinner";
+import React, { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getUsers, createUser, updateUser, deleteUser, updateUserStatus, adminResetPassword, updateUserRole, forceLogoutUser } from "../../services/user.service";
+import {
+  getUsers,
+  createUser,
+  updateUser,
+  deleteUser,
+  updateUserStatus,
+  adminResetPassword,
+  updateUserRole,
+  forceLogoutUser,
+} from "../../services/user.service";
 import { getRoles } from "../../services/role.service";
+import { getPermissions } from "../../services/permission.service";
+import { useAuth } from "../../context/AuthContext";
 import { Card, CardHeader, CardTitle, CardContent } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
 import { Input } from "../../components/ui/input";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../../components/ui/dropdown-menu";
-import { MoreVertical, Lock, Power, UserPlus, Edit, Trash, Search, CheckSquare } from "lucide-react";
-import { useAuth } from "../../context/AuthContext";
+import { LoadingSpinner } from "../../components/ui/LoadingSpinner";
 import { Checkbox } from "../../components/ui/checkbox";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "../../components/ui/dropdown-menu";
+import { UserFormModal } from "../../components/admin/users/UserFormModal";
+import { UserEffectivePermissionsModal } from "../../components/admin/users/UserEffectivePermissionsModal";
+import { ConfirmDialog } from "../../components/common/ConfirmDialog";
+import { notify } from "../../lib/notify";
+import {
+  Users as UsersIcon,
+  UserPlus,
+  Edit,
+  Trash2,
+  Lock,
+  Power,
+  Search,
+  CheckSquare,
+  KeyRound,
+  Crown,
+  ShieldCheck,
+  MoreVertical,
+  LogOut,
+  ShieldAlert,
+  Eye,
+  CheckCircle2,
+  XCircle,
+} from "lucide-react";
 
 export function Users() {
   const queryClient = useQueryClient();
   const { hasPermission, user: currentUser } = useAuth();
-  
+
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
   const [search, setSearch] = useState("");
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
-  
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingUser, setEditingUser] = useState<any>(null);
-  const [formData, setFormData] = useState({ firstName: "", lastName: "", email: "", roleId: "", password: "" });
-  
-  const { data, isLoading } = useQuery({
+
+  // Modals state
+  const [isFormModalOpen, setIsFormModalOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<any | null>(null);
+
+  const [isPermissionsModalOpen, setIsPermissionsModalOpen] = useState(false);
+  const [targetPermissionUser, setTargetPermissionUser] = useState<any | null>(null);
+
+  const [isResetPasswordModalOpen, setIsResetPasswordModalOpen] = useState(false);
+  const [userToResetPassword, setUserToResetPassword] = useState<any | null>(null);
+  const [newPasswordValue, setNewPasswordValue] = useState("");
+  const [resetPasswordError, setResetPasswordError] = useState<string | null>(null);
+
+  // Confirmation dialog states
+  const [userToDelete, setUserToDelete] = useState<any | null>(null);
+  const [userToForceLogout, setUserToForceLogout] = useState<any | null>(null);
+  const [bulkActionType, setBulkActionType] = useState<"activate" | "deactivate" | null>(null);
+
+  // Queries
+  const { data: usersData, isLoading: isLoadingUsers } = useQuery({
     queryKey: ["users", page, limit, search],
     queryFn: () => getUsers({ page, limit, search }),
   });
 
-  const { data: roles = [] } = useQuery({
+  const { data: rolesData, isLoading: isLoadingRoles } = useQuery({
     queryKey: ["roles"],
     queryFn: getRoles,
   });
 
+  const { data: allPermissions = [], isLoading: isLoadingPerms } = useQuery({
+    queryKey: ["permissions"],
+    queryFn: getPermissions,
+  });
+
+  const users = usersData?.data?.users || usersData?.data || [];
+  const totalPages = usersData?.meta?.totalPages || 1;
+  const roles = rolesData?.roles || rolesData || [];
+
+  const isCurrentUserSuperAdmin = currentUser?.role?.name === "SuperAdmin";
+
+  // Mutations
   const toggleStatusMutation = useMutation({
-    mutationFn: ({ id, isActive }: { id: string, isActive: boolean }) => updateUserStatus(id, isActive),
-    onSuccess: () => {
+    mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) =>
+      updateUserStatus(id, isActive),
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["users"] });
       setSelectedUsers([]);
+      notify.success("Status Updated", `User status updated to ${variables.isActive ? "Active" : "Inactive"}.`);
     },
     onError: (error: any) => {
-      alert(error?.response?.data?.message || error?.message || "Error updating user status");
-      console.error("Update status failed", error);
-    }
+      notify.apiError(error, "Failed to update user status.");
+    },
   });
 
   const resetPasswordMutation = useMutation({
-    mutationFn: ({ id, newPassword }: { id: string, newPassword: string }) => adminResetPassword(id, newPassword),
+    mutationFn: ({ id, newPassword }: { id: string; newPassword: string }) =>
+      adminResetPassword(id, newPassword),
     onSuccess: () => {
-      alert("Password reset successful");
-      console.log("Password reset successful");
+      setIsResetPasswordModalOpen(false);
+      setUserToResetPassword(null);
+      setNewPasswordValue("");
+      notify.success("Password Reset", "Temporary password has been set. All previous active sessions were revoked.");
     },
     onError: (error: any) => {
-      alert(error?.response?.data?.message || error?.message || "Error resetting password");
-      console.error("Reset password failed", error);
-    }
+      const msg = error?.response?.data?.message || error?.response?.data?.error?.message || error?.message || "Error resetting password";
+      setResetPasswordError(msg);
+      notify.apiError(error, "Failed to reset password.");
+    },
   });
-  
+
   const deleteMutation = useMutation({
     mutationFn: deleteUser,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["users"] });
-      console.log("User deleted");
+      queryClient.invalidateQueries({ queryKey: ["roles"] });
+      notify.success("Administrator Deleted", `Administrator account ${userToDelete?.email || ""} was removed.`);
+      setUserToDelete(null);
     },
     onError: (error: any) => {
-      alert(error?.response?.data?.message || error?.message || "Error deleting user");
-      console.error("Delete user failed", error);
-    }
+      notify.apiError(error, "Failed to delete administrator account.");
+    },
   });
-  
-  const saveMutation = useMutation({
-    mutationFn: async (data: any) => {
-      console.log("Submitting user", data);
+
+  const forceLogoutMutation = useMutation({
+    mutationFn: forceLogoutUser,
+    onSuccess: () => {
+      notify.success("Sessions Revoked", `Active sessions for ${userToForceLogout?.email || "user"} have been terminated.`);
+      setUserToForceLogout(null);
+    },
+    onError: (error: any) => {
+      notify.apiError(error, "Failed to revoke active user sessions.");
+    },
+  });
+
+  const saveUserMutation = useMutation({
+    mutationFn: async (formData: any) => {
       if (editingUser) {
-        await updateUser(editingUser.id, { firstName: data.firstName, lastName: data.lastName, email: data.email });
-        if (data.roleId && data.roleId !== editingUser.roleId) {
-          await updateUserRole(editingUser.id, data.roleId);
+        await updateUser(editingUser.id, {
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          email: formData.email,
+        });
+        if (formData.roleId && formData.roleId !== editingUser.roleId) {
+          await updateUserRole(editingUser.id, formData.roleId);
         }
       } else {
-        await createUser(data);
+        await createUser(formData);
       }
     },
     onSuccess: () => {
-      setIsModalOpen(false);
+      setIsFormModalOpen(false);
+      setEditingUser(null);
       queryClient.invalidateQueries({ queryKey: ["users"] });
-      console.log(editingUser ? "User updated" : "User created");
+      queryClient.invalidateQueries({ queryKey: ["roles"] });
+      notify.success(editingUser ? "User Updated" : "User Created", `Administrator account successfully ${editingUser ? "updated" : "provisioned"}.`);
     },
     onError: (error: any) => {
-      alert(error?.response?.data?.message || error?.message || (editingUser ? "Error updating user" : "Error creating user"));
-      console.error("Create/update user failed", error);
+      notify.apiError(error, "Failed to save administrator account.");
     },
-    onSettled: () => {
-      // Runs on both success and error
-    }
   });
 
-  const users = data?.data?.users || data?.data || [];
-  const totalPages = data?.meta?.totalPages || 1;
-
-  const handleOpenModal = (user: any = null) => {
-    setEditingUser(user);
-    if (user) {
-      setFormData({ firstName: user.firstName, lastName: user.lastName, email: user.email, roleId: user.roleId || "", password: "" });
-    } else {
-      setFormData({ firstName: "", lastName: "", email: "", roleId: "", password: "" });
-    }
-    setIsModalOpen(true);
+  const handleOpenCreateModal = () => {
+    setEditingUser(null);
+    setIsFormModalOpen(true);
   };
 
+  const handleOpenEditModal = (user: any) => {
+    setEditingUser(user);
+    setIsFormModalOpen(true);
+  };
+
+  const handleOpenEffectivePermissions = (user: any) => {
+    setTargetPermissionUser(user);
+    setIsPermissionsModalOpen(true);
+  };
+
+  const handleOpenResetPassword = (user: any) => {
+    setUserToResetPassword(user);
+    setNewPasswordValue("");
+    setResetPasswordError(null);
+    setIsResetPasswordModalOpen(true);
+  };
+
+  // Bulk actions
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      setSelectedUsers(users.filter((u: any) => u.role?.name !== "SuperAdmin").map((u: any) => u.id));
+      setSelectedUsers(
+        users
+          .filter((u: any) => u.role?.name !== "SuperAdmin" && u.id !== currentUser?.id)
+          .map((u: any) => u.id)
+      );
     } else {
       setSelectedUsers([]);
     }
@@ -123,231 +219,453 @@ export function Users() {
     if (checked) {
       setSelectedUsers([...selectedUsers, id]);
     } else {
-      setSelectedUsers(selectedUsers.filter(uId => uId !== id));
+      setSelectedUsers(selectedUsers.filter((uId) => uId !== id));
     }
   };
 
-  const handleBulkActivate = async () => {
-    if (confirm(`Are you sure you want to activate ${selectedUsers.length} users?`)) {
-      try {
-        for (const id of selectedUsers) {
-          await toggleStatusMutation.mutateAsync({ id, isActive: true });
-        }
-      } catch (e) {
-        console.error("Bulk activate stopped due to error:", e);
+  const handleExecuteBulkAction = async () => {
+    if (!bulkActionType) return;
+    const isActive = bulkActionType === "activate";
+    try {
+      for (const id of selectedUsers) {
+        await toggleStatusMutation.mutateAsync({ id, isActive });
       }
+      notify.success("Bulk Action Complete", `Successfully ${isActive ? "activated" : "deactivated"} ${selectedUsers.length} administrators.`);
+      setSelectedUsers([]);
+      setBulkActionType(null);
+    } catch (err) {
+      notify.apiError(err, "An error occurred during bulk operation.");
     }
   };
 
-  const handleBulkDeactivate = async () => {
-    if (confirm(`Are you sure you want to deactivate ${selectedUsers.length} users?`)) {
-      try {
-        for (const id of selectedUsers) {
-          await toggleStatusMutation.mutateAsync({ id, isActive: false });
-        }
-      } catch (e) {
-        console.error("Bulk deactivate stopped due to error:", e);
-      }
-    }
-  };
-
-  if (isLoading) return <LoadingSpinner />;
+  if (isLoadingUsers || isLoadingRoles || isLoadingPerms) return <LoadingSpinner />;
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold tracking-tight">Users</h1>
-        <div className="flex gap-2">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-2.5">
+          <div className="p-2 rounded-lg bg-primary/10 text-primary">
+            <UsersIcon className="h-6 w-6" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">
+              Admin Users & Staff
+            </h1>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Manage administrator accounts, assign access roles, and inspect effective permission policies
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
           {selectedUsers.length > 0 && hasPermission("Users", "write") && (
             <>
-              <Button variant="outline" onClick={handleBulkActivate}><CheckSquare className="mr-2 h-4 w-4" /> Activate ({selectedUsers.length})</Button>
-              <Button variant="outline" className="text-destructive hover:bg-destructive/10" onClick={handleBulkDeactivate}><Power className="mr-2 h-4 w-4" /> Deactivate ({selectedUsers.length})</Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setBulkActionType("activate")}
+                className="text-xs"
+              >
+                <CheckSquare className="mr-1.5 h-3.5 w-3.5 text-emerald-600" />
+                Activate ({selectedUsers.length})
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-xs text-destructive hover:bg-destructive/10"
+                onClick={() => setBulkActionType("deactivate")}
+              >
+                <Power className="mr-1.5 h-3.5 w-3.5" />
+                Deactivate ({selectedUsers.length})
+              </Button>
             </>
           )}
+
           {hasPermission("Users", "write") && (
-            <Button onClick={() => handleOpenModal()}><UserPlus className="mr-2 h-4 w-4" /> Add User</Button>
+            <Button onClick={handleOpenCreateModal} className="shadow-xs text-xs h-9">
+              <UserPlus className="mr-1.5 h-4 w-4" />
+              Add Administrator
+            </Button>
           )}
         </div>
       </div>
 
-      <div className="flex gap-4 mb-4">
+      {/* Search Bar */}
+      <div className="flex items-center justify-between gap-4">
         <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input 
-            placeholder="Search users..." 
-            className="pl-8" 
+          <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search by name or email..."
+            className="pl-9 h-9 text-xs"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
       </div>
 
-      <Card>
+      {/* Users Table */}
+      <Card className="shadow-xs border-border/80">
         <CardContent className="p-0">
           <Table>
             <TableHeader>
-              <TableRow>
-                <TableHead className="w-[50px]">
-                  <Checkbox 
-                    checked={selectedUsers.length > 0 && selectedUsers.length === users.filter((u: any) => u.role?.name !== "SuperAdmin").length}
+              <TableRow className="bg-muted/30">
+                <TableHead className="w-[45px]">
+                  <Checkbox
+                    checked={
+                      selectedUsers.length > 0 &&
+                      selectedUsers.length ===
+                        users.filter(
+                          (u: any) => u.role?.name !== "SuperAdmin" && u.id !== currentUser?.id
+                        ).length
+                    }
                     onChange={(e: any) => handleSelectAll(e.target.checked)}
                   />
                 </TableHead>
-                <TableHead>Name</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead className="font-semibold text-xs">Administrator</TableHead>
+                <TableHead className="font-semibold text-xs">Email</TableHead>
+                <TableHead className="font-semibold text-xs">Assigned Role</TableHead>
+                <TableHead className="font-semibold text-xs">Status</TableHead>
+                <TableHead className="font-semibold text-xs text-center">Permissions</TableHead>
+                <TableHead className="text-right font-semibold text-xs w-[140px]">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {users.map((user: any) => (
-                <TableRow key={user.id}>
-                  <TableCell>
-                    <Checkbox 
-                      checked={selectedUsers.includes(user.id)}
-                      disabled={user.role?.name === "SuperAdmin"}
-                      onChange={(e: any) => handleSelect(user.id, e.target.checked)}
-                    />
-                  </TableCell>
-                  <TableCell className="font-medium">{user.firstName} {user.lastName}</TableCell>
-                  <TableCell>{user.email}</TableCell>
-                  <TableCell><Badge variant="outline">{user.role?.name}</Badge></TableCell>
-                  <TableCell>
-                    <Badge variant={user.isActive ? "default" : "destructive"}>
-                      {user.isActive ? "Active" : "Inactive"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {hasPermission("Users", "write") && (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleOpenModal(user)}>
-                            <Edit className="mr-2 h-4 w-4" /> Edit
-                          </DropdownMenuItem>
-                          
-                          {user.role?.name !== "SuperAdmin" && (
-                            <DropdownMenuItem onClick={() => toggleStatusMutation.mutate({ id: user.id, isActive: !user.isActive })}>
-                              <Power className="mr-2 h-4 w-4" />
-                              {user.isActive ? "Deactivate" : "Activate"}
-                            </DropdownMenuItem>
-                          )}
-                          
-                          <DropdownMenuItem onClick={() => {
-                            const newPass = prompt("Enter new password for " + user.email);
-                            if (newPass) resetPasswordMutation.mutate({ id: user.id, newPassword: newPass });
-                          }}>
-                            <Lock className="mr-2 h-4 w-4" /> Reset Password
-                          </DropdownMenuItem>
+              {users.map((user: any) => {
+                const isSuperAdmin = user.role?.name === "SuperAdmin";
+                const isSelf = user.id === currentUser?.id;
+                const canModifyUser =
+                  hasPermission("Users", "write") &&
+                  (!isSuperAdmin || isCurrentUserSuperAdmin);
 
-                          {hasPermission("Users", "write") && (
-                            <DropdownMenuItem onClick={async () => {
-                              if (confirm(`Force logout all sessions for ${user.email}?`)) {
-                                try {
-                                  await forceLogoutUser(user.id);
-                                  alert("User has been forced to logout.");
-                                } catch (error: any) {
-                                  alert(error?.response?.data?.message || error?.message || "Error forcing logout");
-                                  console.error("Force logout failed", error);
-                                }
-                              }
-                            }}>
-                              <Power className="mr-2 h-4 w-4" /> Force Logout
+                return (
+                  <TableRow key={user.id} className="hover:bg-muted/40 transition-colors">
+                    {/* Checkbox */}
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedUsers.includes(user.id)}
+                        disabled={isSuperAdmin || isSelf}
+                        onChange={(e: any) => handleSelect(user.id, e.target.checked)}
+                      />
+                    </TableCell>
+
+                    {/* Name */}
+                    <TableCell className="font-medium py-3.5">
+                      <div className="flex items-center gap-2.5">
+                        <div className="h-8 w-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs shrink-0">
+                          {user.firstName?.charAt(0) || "U"}
+                          {user.lastName?.charAt(0) || ""}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-semibold text-sm text-foreground">
+                              {user.firstName} {user.lastName}
+                            </span>
+                            {isSelf && (
+                              <Badge variant="secondary" className="text-[10px] h-4 px-1 font-normal">
+                                You
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </TableCell>
+
+                    {/* Email */}
+                    <TableCell className="text-xs text-muted-foreground">{user.email}</TableCell>
+
+                    {/* Role */}
+                    <TableCell>
+                      {isSuperAdmin ? (
+                        <Badge variant="default" className="text-[10px] bg-primary gap-1">
+                          <Crown className="h-2.5 w-2.5" />
+                          SuperAdmin
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-[10px]">
+                          {user.role?.name || "No Role"}
+                        </Badge>
+                      )}
+                    </TableCell>
+
+                    {/* Status */}
+                    <TableCell>
+                      <Badge
+                        variant={user.isActive ? "success" : "destructive"}
+                        className="text-[10px] h-5"
+                      >
+                        {user.isActive ? "Active" : "Inactive"}
+                      </Badge>
+                    </TableCell>
+
+                    {/* Effective Permissions Trigger */}
+                    <TableCell className="text-center">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs px-2 text-primary hover:text-primary hover:bg-primary/10"
+                        onClick={() => handleOpenEffectivePermissions(user)}
+                        title="View effective permissions matrix"
+                      >
+                        <Eye className="h-3.5 w-3.5 mr-1" />
+                        Inspect Matrix
+                      </Button>
+                    </TableCell>
+
+                    {/* Actions Menu */}
+                    <TableCell className="text-right py-3.5">
+                      <div className="flex items-center justify-end gap-1">
+                        {canModifyUser && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                            onClick={() => handleOpenEditModal(user)}
+                            title="Edit details & role"
+                          >
+                            <Edit className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-48 text-xs">
+                            <DropdownMenuItem onClick={() => handleOpenEffectivePermissions(user)}>
+                              <Eye className="mr-2 h-3.5 w-3.5 text-primary" /> View Permissions
                             </DropdownMenuItem>
-                          )}
-                          
-                          {hasPermission("Users", "delete") && user.role?.name !== "SuperAdmin" && (
-                            <DropdownMenuItem 
-                              className="text-destructive focus:bg-destructive/10 cursor-pointer"
-                              onClick={() => {
-                                if (confirm("Are you sure you want to delete this user?")) {
-                                  deleteMutation.mutate(user.id);
+
+                            {canModifyUser && (
+                              <DropdownMenuItem onClick={() => handleOpenEditModal(user)}>
+                                <Edit className="mr-2 h-3.5 w-3.5" /> Edit Profile & Role
+                              </DropdownMenuItem>
+                            )}
+
+                            {canModifyUser && !isSelf && (
+                              <DropdownMenuItem
+                                onClick={() =>
+                                  toggleStatusMutation.mutate({
+                                    id: user.id,
+                                    isActive: !user.isActive,
+                                  })
                                 }
-                              }}>
-                              <Trash className="mr-2 h-4 w-4" /> Delete
-                            </DropdownMenuItem>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
+                              >
+                                <Power className="mr-2 h-3.5 w-3.5 text-amber-600" />
+                                {user.isActive ? "Deactivate Account" : "Activate Account"}
+                              </DropdownMenuItem>
+                            )}
+
+                            {canModifyUser && (
+                              <DropdownMenuItem onClick={() => handleOpenResetPassword(user)}>
+                                <Lock className="mr-2 h-3.5 w-3.5" /> Reset Password
+                              </DropdownMenuItem>
+                            )}
+
+                            {hasPermission("Users", "write") && (
+                              <DropdownMenuItem
+                                onClick={() => setUserToForceLogout(user)}
+                              >
+                                <LogOut className="mr-2 h-3.5 w-3.5" /> Force Logout
+                              </DropdownMenuItem>
+                            )}
+
+                            {hasPermission("Users", "delete") && !isSuperAdmin && !isSelf && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  className="text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer"
+                                  onClick={() => setUserToDelete(user)}
+                                >
+                                  <Trash2 className="mr-2 h-3.5 w-3.5" /> Delete Account
+                                </DropdownMenuItem>
+                              </>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
+
+          {users.length === 0 && (
+            <div className="text-center py-12">
+              <UsersIcon className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+              <p className="text-sm font-medium text-foreground">No administrators found</p>
+            </div>
+          )}
         </CardContent>
       </Card>
-      
-      <div className="flex justify-between items-center">
-        <span className="text-sm text-muted-foreground">Page {page} of {totalPages}</span>
+
+      {/* Pagination */}
+      <div className="flex justify-between items-center text-xs">
+        <span className="text-muted-foreground">
+          Page {page} of {totalPages}
+        </span>
         <div className="space-x-2">
-          <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage(p => p - 1)}>Previous</Button>
-          <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>Next</Button>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page === 1}
+            onClick={() => setPage((p) => p - 1)}
+            className="h-8 text-xs"
+          >
+            Previous
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page >= totalPages}
+            onClick={() => setPage((p) => p + 1)}
+            className="h-8 text-xs"
+          >
+            Next
+          </Button>
         </div>
       </div>
-      
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <Card className="w-full max-w-md shadow-lg border-muted">
-            <CardHeader>
-              <CardTitle>{editingUser ? "Edit User" : "Add User"}</CardTitle>
+
+      {/* Add / Edit User Modal */}
+      <UserFormModal
+        isOpen={isFormModalOpen}
+        onClose={() => setIsFormModalOpen(false)}
+        onSubmit={async (data) => {
+          await saveUserMutation.mutateAsync(data);
+        }}
+        editingUser={editingUser}
+        roles={roles}
+        currentUserId={currentUser?.id}
+        isCurrentUserSuperAdmin={isCurrentUserSuperAdmin}
+        isPending={saveUserMutation.isPending}
+      />
+
+      {/* Effective Permissions Modal */}
+      <UserEffectivePermissionsModal
+        isOpen={isPermissionsModalOpen}
+        onClose={() => {
+          setIsPermissionsModalOpen(false);
+          setTargetPermissionUser(null);
+        }}
+        user={targetPermissionUser}
+        allPermissions={allPermissions}
+      />
+
+      {/* Admin Reset Password Modal */}
+      {isResetPasswordModalOpen && userToResetPassword && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+          <Card className="w-full max-w-md shadow-2xl border-border bg-background">
+            <CardHeader className="flex flex-row items-center gap-3 border-b pb-4">
+              <div className="p-2 rounded-lg bg-primary/10 text-primary">
+                <Lock className="h-5 w-5" />
+              </div>
+              <div>
+                <CardTitle className="text-lg font-bold">Reset Password</CardTitle>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  User: {userToResetPassword.email}
+                </p>
+              </div>
             </CardHeader>
-            <CardContent>
-              <form onSubmit={(e) => { e.preventDefault(); saveMutation.mutate(formData); }} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">First Name</label>
-                    <Input required value={formData.firstName} onChange={(e) => setFormData({ ...formData, firstName: e.target.value })} />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Last Name</label>
-                    <Input required value={formData.lastName} onChange={(e) => setFormData({ ...formData, lastName: e.target.value })} />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Email</label>
-                  <Input type="email" required value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
-                </div>
-                {!editingUser && (
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Password</label>
-                    <Input type="password" required value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} />
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                resetPasswordMutation.mutate({
+                  id: userToResetPassword.id,
+                  newPassword: newPasswordValue,
+                });
+              }}
+            >
+              <CardContent className="p-6 space-y-4">
+                {resetPasswordError && (
+                  <div className="p-3 text-xs text-destructive bg-destructive/10 rounded-md">
+                    {resetPasswordError}
                   </div>
                 )}
-                {hasPermission("Users", "write") && (
-                  <div className="space-y-2 flex flex-col">
-                    <label className="text-sm font-medium">Role</label>
-                    <select 
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
-                      required
-                      value={formData.roleId} 
-                      onChange={(e) => setFormData({ ...formData, roleId: e.target.value })}
-                    >
-                      <option value="" disabled>Select a role</option>
-                      {roles?.roles?.map((r: any) => (
-                        <option key={r.id} value={r.id}>{r.name}</option>
-                      )) || roles.map?.((r: any) => (
-                        <option key={r.id} value={r.id}>{r.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-                <div className="flex justify-end gap-2 pt-4">
-                  <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>Cancel</Button>
-                  <Button type="submit" disabled={saveMutation.isPending}>
-                    {saveMutation.isPending ? "Saving..." : "Save"}
-                  </Button>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-foreground">
+                    New Temporary Password
+                  </label>
+                  <Input
+                    type="password"
+                    required
+                    placeholder="Min 12 characters"
+                    value={newPasswordValue}
+                    onChange={(e) => setNewPasswordValue(e.target.value)}
+                    className="h-9 text-xs"
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    All existing active sessions for this user will be invalidated upon reset.
+                  </p>
                 </div>
-              </form>
-            </CardContent>
+              </CardContent>
+              <div className="flex items-center justify-end gap-2 px-6 py-4 border-t bg-muted/10">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsResetPasswordModalOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  size="sm"
+                  disabled={resetPasswordMutation.isPending || !newPasswordValue}
+                >
+                  {resetPasswordMutation.isPending ? "Resetting..." : "Reset Password"}
+                </Button>
+              </div>
+            </form>
           </Card>
         </div>
       )}
+
+      {/* Delete User Confirmation */}
+      <ConfirmDialog
+        isOpen={!!userToDelete}
+        onOpenChange={(open) => !open && setUserToDelete(null)}
+        title="Delete Administrator"
+        description={
+          <>
+            Are you sure you want to permanently remove administrator account <strong>{userToDelete?.firstName} {userToDelete?.lastName} ({userToDelete?.email})</strong>? This action cannot be undone.
+          </>
+        }
+        confirmText="Delete Account"
+        variant="destructive"
+        isLoading={deleteMutation.isPending}
+        onConfirm={() => userToDelete && deleteMutation.mutate(userToDelete.id)}
+      />
+
+      {/* Force Logout Confirmation */}
+      <ConfirmDialog
+        isOpen={!!userToForceLogout}
+        onOpenChange={(open) => !open && setUserToForceLogout(null)}
+        title="Force Session Logout"
+        description={
+          <>
+            Are you sure you want to revoke all active sessions for <strong>{userToForceLogout?.email}</strong>? They will be immediately signed out of all devices.
+          </>
+        }
+        confirmText="Revoke Sessions"
+        variant="warning"
+        isLoading={forceLogoutMutation.isPending}
+        onConfirm={() => userToForceLogout && forceLogoutMutation.mutate(userToForceLogout.id)}
+      />
+
+      {/* Bulk Action Confirmation */}
+      <ConfirmDialog
+        isOpen={!!bulkActionType}
+        onOpenChange={(open) => !open && setBulkActionType(null)}
+        title={`Bulk ${bulkActionType === "activate" ? "Activation" : "Deactivation"}`}
+        description={`Are you sure you want to ${bulkActionType === "activate" ? "activate" : "deactivate"} ${selectedUsers.length} selected administrator account(s)?`}
+        confirmText={`Confirm ${bulkActionType === "activate" ? "Activate" : "Deactivate"}`}
+        variant={bulkActionType === "deactivate" ? "destructive" : "default"}
+        isLoading={toggleStatusMutation.isPending}
+        onConfirm={handleExecuteBulkAction}
+      />
     </div>
   );
 }

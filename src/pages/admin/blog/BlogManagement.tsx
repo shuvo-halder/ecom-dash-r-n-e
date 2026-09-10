@@ -32,6 +32,8 @@ import {
   Image as ImageIcon,
   User as UserIcon,
 } from 'lucide-react';
+import { ConfirmDialog } from '../../../components/common/ConfirmDialog';
+import { notify } from '../../../lib/notify';
 
 export function BlogManagement() {
   const navigate = useNavigate();
@@ -68,10 +70,11 @@ export function BlogManagement() {
     mutationFn: blogService.deletePost,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['blog-posts'] });
+      notify.success('Blog Post Deleted', `Post "${confirmDeleteTitle}" has been removed.`);
       setConfirmDeleteId(null);
     },
     onError: (err: any) => {
-      alert(err.response?.data?.error?.message || 'Failed to delete blog post.');
+      notify.apiError(err, 'Failed to delete blog post.');
       setConfirmDeleteId(null);
     },
   });
@@ -261,7 +264,7 @@ export function BlogManagement() {
                             <span className="line-clamp-1 text-foreground">{post.title}</span>
                             {post.excerpt && (
                               <span className="text-xs text-muted-foreground line-clamp-1 font-normal">
-                                {post.excerpt}
+                                {post.excerpt.replace(/<[^>]*>/g, '')}
                               </span>
                             )}
                           </div>
@@ -353,47 +356,20 @@ export function BlogManagement() {
         </div>
       )}
 
-      {/* Delete Confirmation Modal Overlay */}
-      {confirmDeleteId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-background border rounded-lg shadow-lg max-w-md w-full mx-4 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            <div className="p-6 space-y-4">
-              <div className="flex items-center gap-3 text-destructive">
-                <div className="p-2 rounded-full bg-destructive/10">
-                  <AlertTriangle className="h-6 w-6" />
-                </div>
-                <h3 className="text-lg font-bold">Confirm Blog Post Deletion</h3>
-              </div>
-              <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">
-                  Are you sure you want to delete the blog post <strong>"{confirmDeleteTitle}"</strong>?
-                </p>
-                <p className="text-xs text-destructive bg-destructive/5 p-2 rounded border border-destructive/10">
-                  Warning: This action moves the blog post to a deleted state, taking it offline immediately.
-                </p>
-              </div>
-              <div className="flex justify-end gap-2 pt-2">
-                <Button
-                  id="blog-cancel-delete-modal-btn"
-                  variant="outline"
-                  onClick={() => setConfirmDeleteId(null)}
-                  disabled={deleteMutation.isPending}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  id="blog-confirm-delete-modal-btn"
-                  variant="destructive"
-                  onClick={confirmDelete}
-                  disabled={deleteMutation.isPending}
-                >
-                  {deleteMutation.isPending ? 'Deleting...' : 'Delete Permanently'}
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        isOpen={!!confirmDeleteId}
+        onOpenChange={(open) => !open && setConfirmDeleteId(null)}
+        title="Confirm Blog Post Deletion"
+        description={
+          <>
+            Are you sure you want to delete the blog post <strong>"{confirmDeleteTitle}"</strong>? This will immediately remove it from your store blog feed.
+          </>
+        }
+        confirmText="Delete Permanently"
+        variant="destructive"
+        isLoading={deleteMutation.isPending}
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 }

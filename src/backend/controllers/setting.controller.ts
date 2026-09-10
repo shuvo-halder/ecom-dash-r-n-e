@@ -113,3 +113,17 @@ export const updateTax = async (req: AuthRequest, res: Response, next: NextFunct
     res.status(200).json({ status: "success", data: result });
   } catch (error) { next(error); }
 };
+
+export const getStore = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const result = await SettingService.getStore();
+    res.status(200).json({ status: "success", data: result });
+  } catch (error) { next(error); }
+};
+
+export const updateStore = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const result = await SettingService.updateStore(req.body, req.user!.id);
+    res.status(200).json({ status: "success", data: result });
+  } catch (error) { next(error); }
+};

@@ -37,7 +37,7 @@ const DEFAULT_BRANDING: BrandingData = {
   primaryColor: "#0f172a",
   footerText: "© 2026 Enterprise Commerce System. All rights reserved.",
   defaultLanguage: "en",
-  defaultCurrency: "USD",
+  defaultCurrency: "BDT",
   defaultTimezone: "UTC"
 };
 

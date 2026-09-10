@@ -5,6 +5,7 @@ import { CmsPageForm } from './CmsPageForm';
 import { pageService } from '../../../services/page.service';
 import { ArrowLeft, FileText, Loader2 } from 'lucide-react';
 import { Button } from '../../../components/ui/button';
+import { notify } from '../../../lib/notify';
 
 export function CmsPageEdit() {
   const { id } = useParams<{ id: string }>();
@@ -20,14 +21,14 @@ export function CmsPageEdit() {
 
   const mutation = useMutation({
     mutationFn: (data: any) => pageService.updatePage(id!, data),
-    onSuccess: () => {
+    onSuccess: (res: any) => {
       queryClient.invalidateQueries({ queryKey: ['cms-pages'] });
       queryClient.invalidateQueries({ queryKey: ['cms-pages', id] });
+      notify.success('CMS Page Updated', `Page "${res?.title || 'CMS Page'}" updated successfully.`);
       navigate('/admin/cms');
     },
     onError: (error: any) => {
-      console.error('Failed to update page', error);
-      alert(error.response?.data?.error?.message || 'Failed to update page.');
+      notify.apiError(error, 'Failed to update CMS page.');
     }
   });
 

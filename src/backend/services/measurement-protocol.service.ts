@@ -178,7 +178,7 @@ export class MeasurementProtocolService {
       params: {
         transaction_id: String(order.orderNumber || order.id),
         value: Number(order.totalAmount || order.total || 0),
-        currency: order.currency || "USD",
+        currency: order.currency || "BDT",
         tax: Number(order.taxAmount || 0),
         shipping: Number(order.shippingAmount || 0),
         coupon: order.couponCode || undefined,
@@ -233,7 +233,7 @@ export class MeasurementProtocolService {
       params: {
         transaction_id: String(order.orderNumber || order.id),
         value: Number(refund.amount || 0),
-        currency: refund.currency || order.currency || "USD",
+        currency: refund.currency || order.currency || "BDT",
         ...(sessionId ? { session_id: sessionId } : {}),
         engagement_time_msec: 100
       }

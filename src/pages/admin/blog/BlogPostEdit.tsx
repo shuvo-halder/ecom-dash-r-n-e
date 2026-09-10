@@ -5,6 +5,7 @@ import { BlogPostForm } from './BlogPostForm';
 import { blogService } from '../../../services/blog.service';
 import { ArrowLeft, PenTool, Loader2 } from 'lucide-react';
 import { Button } from '../../../components/ui/button';
+import { notify } from '../../../lib/notify';
 
 export function BlogPostEdit() {
   const { id } = useParams<{ id: string }>();
@@ -20,14 +21,14 @@ export function BlogPostEdit() {
 
   const mutation = useMutation({
     mutationFn: (data: any) => blogService.updatePost(id!, data),
-    onSuccess: () => {
+    onSuccess: (res: any) => {
       queryClient.invalidateQueries({ queryKey: ['blog-posts'] });
       queryClient.invalidateQueries({ queryKey: ['blog-posts', id] });
+      notify.success('Blog Post Updated', `Post "${res?.title || 'Blog Post'}" updated successfully.`);
       navigate('/admin/blog');
     },
     onError: (error: any) => {
-      console.error('Failed to update post', error);
-      alert(error.response?.data?.error?.message || 'Failed to update blog post.');
+      notify.apiError(error, 'Failed to update blog post.');
     }
   });
 

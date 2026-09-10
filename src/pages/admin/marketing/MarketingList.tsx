@@ -19,11 +19,14 @@ import {
 } from 'lucide-react';
 import { Button } from '../../../components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '../../../components/ui/card';
+import { ConfirmDialog } from '../../../components/common/ConfirmDialog';
+import { notify } from '../../../lib/notify';
 
 export function MarketingList() {
   const queryClient = useQueryClient();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCampaign, setEditingCampaign] = useState<MarketingCampaign | null>(null);
+  const [campaignToDelete, setCampaignToDelete] = useState<MarketingCampaign | null>(null);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -57,31 +60,44 @@ export function MarketingList() {
 
   const createMutation = useMutation({
     mutationFn: (data: Partial<MarketingCampaign>) => marketingService.createCampaign(data),
-    onSuccess: () => {
+    onSuccess: (res: any) => {
       queryClient.invalidateQueries({ queryKey: ['marketing-campaigns'] });
       setIsModalOpen(false);
       resetForm();
+      notify.success('Campaign Created', `Campaign "${res?.name || formData.name}" created.`);
     },
+    onError: (err) => notify.apiError(err, 'Failed to create campaign.')
   });
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: Partial<MarketingCampaign> }) => marketingService.updateCampaign(id, data),
-    onSuccess: () => {
+    onSuccess: (res: any) => {
       queryClient.invalidateQueries({ queryKey: ['marketing-campaigns'] });
       setIsModalOpen(false);
       setEditingCampaign(null);
       resetForm();
+      notify.success('Campaign Updated', `Campaign "${res?.name || 'Campaign'}" updated.`);
     },
+    onError: (err) => notify.apiError(err, 'Failed to update campaign.')
   });
 
   const statusMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) => marketingService.updateStatus(id, status),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['marketing-campaigns'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['marketing-campaigns'] });
+      notify.success('Campaign Dispatched', 'Campaign status updated and messages dispatched.');
+    },
+    onError: (err) => notify.apiError(err, 'Failed to dispatch campaign.')
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => marketingService.deleteCampaign(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['marketing-campaigns'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['marketing-campaigns'] });
+      notify.success('Campaign Deleted', `Campaign "${campaignToDelete?.name || 'Campaign'}" was deleted.`);
+      setCampaignToDelete(null);
+    },
+    onError: (err) => notify.apiError(err, 'Failed to delete campaign.')
   });
 
   const resetForm = () => {
@@ -271,11 +287,8 @@ export function MarketingList() {
                         <Button 
                           size="icon" 
                           variant="ghost" 
-                          onClick={() => {
-                            if (confirm(`Delete campaign ${c.name}?`)) {
-                              deleteMutation.mutate(c.id);
-                            }
-                          }}
+                          title="Delete Campaign"
+                          onClick={() => setCampaignToDelete(c)}
                         >
                           <Trash2 className="h-4 w-4 text-rose-500" />
                         </Button>
@@ -386,6 +399,21 @@ export function MarketingList() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={!!campaignToDelete}
+        onOpenChange={(open) => !open && setCampaignToDelete(null)}
+        title="Delete Marketing Campaign"
+        description={
+          <>
+            Are you sure you want to permanently delete campaign <strong>{campaignToDelete?.name}</strong>?
+          </>
+        }
+        confirmText="Delete Campaign"
+        variant="destructive"
+        isLoading={deleteMutation.isPending}
+        onConfirm={() => campaignToDelete && deleteMutation.mutate(campaignToDelete.id)}
+      />
     </div>
   );
 }

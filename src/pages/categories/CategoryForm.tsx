@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/src/components/ui/card';
 import { useQuery } from '@tanstack/react-query';
 import { getCategories } from '../../services/category.service';
 import { MediaUploaderInput } from '../../components/admin/MediaUploaderInput';
+import { RichTextEditor } from '@/src/components/ui/RichTextEditor';
 
 interface CategoryFormProps {
   initialData?: any;
@@ -106,13 +107,13 @@ export function CategoryForm({ initialData, onSubmit, isLoading }: CategoryFormP
             </div>
             
             <div className="col-span-1 md:col-span-2 space-y-2">
-              <label className="text-sm font-medium">Description</label>
-              <textarea 
-                name="description" 
-                value={formData.description} 
-                onChange={handleChange} 
-                rows={3}
-                className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              <RichTextEditor
+                label="Description"
+                value={formData.description}
+                onChange={(val) => setFormData((prev) => ({ ...prev, description: val }))}
+                placeholder="Category description, banner copy, or overview..."
+                minHeight="180px"
+                folder="categories"
               />
             </div>
 

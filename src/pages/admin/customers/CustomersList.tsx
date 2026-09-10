@@ -24,6 +24,8 @@ import {
 import { Button } from "../../../components/ui/button";
 import { Input } from "../../../components/ui/input";
 import { useAuth } from "../../../context/AuthContext";
+import { ConfirmDialog } from "../../../components/common/ConfirmDialog";
+import { notify } from "../../../lib/notify";
 
 export function CustomersList() {
   const navigate = useNavigate();
@@ -43,6 +45,10 @@ export function CustomersList() {
   const [noteText, setNoteText] = useState("");
   const [noteModalOpen, setNoteModalOpen] = useState(false);
   const [submittingNote, setSubmittingNote] = useState(false);
+
+  // Reset password confirmation
+  const [customerToReset, setCustomerToReset] = useState<any | null>(null);
+  const [resettingPassword, setResettingPassword] = useState(false);
 
   const fetchCustomers = async () => {
     setLoading(true);
@@ -72,19 +78,24 @@ export function CustomersList() {
     const newStatus = !customer.isActive;
     try {
       await updateCustomerStatus(customer.id, newStatus);
+      notify.success("Status Updated", `Customer account ${newStatus ? "activated" : "deactivated"}.`);
       fetchCustomers();
     } catch (err: any) {
-      alert(err.response?.data?.message || "Failed to update customer status.");
+      notify.apiError(err, "Failed to update customer status.");
     }
   };
 
-  const handleResetPassword = async (customer: any) => {
-    if (!confirm(`Trigger force password reset for ${customer.email}?`)) return;
+  const handleConfirmResetPassword = async () => {
+    if (!customerToReset) return;
+    setResettingPassword(true);
     try {
-      const res = await resetCustomerPassword(customer.id);
-      alert(res.message || "Password reset triggered successfully!");
+      const res = await resetCustomerPassword(customerToReset.id);
+      notify.success("Password Reset Initiated", res?.message || `Password reset link sent to ${customerToReset.email}.`);
+      setCustomerToReset(null);
     } catch (err: any) {
-      alert(err.response?.data?.message || "Failed to reset password.");
+      notify.apiError(err, "Failed to reset customer password.");
+    } finally {
+      setResettingPassword(false);
     }
   };
 
@@ -96,9 +107,9 @@ export function CustomersList() {
       await addCustomerNote(selectedCust.id, noteText);
       setNoteModalOpen(false);
       setNoteText("");
-      alert("Note added to customer account.");
+      notify.success("Note Added", "Internal customer note recorded.");
     } catch (err: any) {
-      alert(err.response?.data?.message || "Failed to add note.");
+      notify.apiError(err, "Failed to add note.");
     } finally {
       setSubmittingNote(false);
     }
@@ -179,8 +190,24 @@ export function CustomersList() {
                       </Link>
                     </td>
                     <td className="px-4 py-3">
-                      <p className="text-foreground">{cust.email}</p>
-                      <p className="text-xs text-muted-foreground">{cust.phone || "No phone"}</p>
+                      <div className="flex items-center gap-1">
+                        <p className="text-foreground">{cust.email}</p>
+                        {cust.emailVerified ? (
+                          <CheckCircle className="w-3 h-3 text-emerald-500" />
+                        ) : (
+                          <AlertCircle className="w-3 h-3 text-amber-500" />
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
+                        <p>{cust.phone || "No phone"}</p>
+                        {cust.phone ? (
+                          cust.phoneVerified ? (
+                            <CheckCircle className="w-3 h-3 text-emerald-500" />
+                          ) : (
+                            <AlertCircle className="w-3 h-3 text-amber-500" />
+                          )
+                        ) : null}
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       {cust.isActive ? (
@@ -197,7 +224,7 @@ export function CustomersList() {
                       {cust.totalOrders || 0}
                     </td>
                     <td className="px-4 py-3 text-right font-bold text-emerald-600">
-                      ${Number(cust.lifetimeValue || 0).toFixed(2)}
+                      ৳{Number(cust.lifetimeValue || 0).toFixed(2)}
                     </td>
                     <td className="px-4 py-3 text-xs text-muted-foreground">
                       {cust.lastOrderDate ? new Date(cust.lastOrderDate).toLocaleDateString() : "Never"}
@@ -208,7 +235,7 @@ export function CustomersList() {
                           variant="ghost"
                           size="sm"
                           onClick={() => navigate(`/customers/${cust.id}`)}
-                          title="View Customer Profile"
+                         
                         >
                           <Eye className="w-4 h-4" />
                         </Button>
@@ -219,15 +246,15 @@ export function CustomersList() {
                               variant="ghost"
                               size="sm"
                               onClick={() => { setSelectedCust(cust); setNoteModalOpen(true); }}
-                              title="Add Note"
+                             
                             >
                               <FileText className="w-4 h-4 text-blue-600" />
                             </Button>
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => handleResetPassword(cust)}
-                              title="Force Password Reset"
+                              onClick={() => setCustomerToReset(cust)}
+                             
                             >
                               <Key className="w-4 h-4 text-amber-600" />
                             </Button>
@@ -309,6 +336,22 @@ export function CustomersList() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        title="Reset Customer Password"
+        isOpen={!!customerToReset}
+        onOpenChange={(open) => !open && setCustomerToReset(null)}
+       
+        description={
+          <>
+            Are you sure you want to trigger a password reset for customer <strong>{customerToReset?.email}</strong>? An automated reset instructions email will be sent.
+          </>
+        }
+        confirmText="Trigger Reset"
+        variant="warning"
+        isLoading={resettingPassword}
+        onConfirm={handleConfirmResetPassword}
+      />
     </div>
   );
 }

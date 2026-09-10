@@ -5,6 +5,7 @@ import { BrandForm } from './BrandForm';
 import { createBrand } from '../../services/brand.service';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/src/components/ui/button';
+import { notify } from '@/src/lib/notify';
 
 export function BrandCreate() {
   const navigate = useNavigate();
@@ -12,13 +13,13 @@ export function BrandCreate() {
 
   const mutation = useMutation({
     mutationFn: createBrand,
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['brands'] });
+      notify.success('Brand Created', `"${data?.name || 'Brand'}" was added to manufacturers.`);
       navigate('/brands');
     },
     onError: (error: any) => {
-      console.error('Failed to create brand', error);
-      alert(error.response?.data?.error?.message || 'Failed to create brand');
+      notify.apiError(error, 'Failed to create brand.');
     }
   });
 
@@ -35,3 +36,4 @@ export function BrandCreate() {
     </div>
   );
 }
+

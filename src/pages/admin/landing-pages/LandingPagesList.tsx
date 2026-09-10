@@ -36,6 +36,8 @@ import {
   CheckCircle2,
   RotateCcw
 } from 'lucide-react';
+import { ConfirmDialog } from '../../../components/common/ConfirmDialog';
+import { notify } from '../../../lib/notify';
 
 // Block type structures
 type BlockType = 'hero' | 'text' | 'image' | 'cta' | 'features' | 'faq';
@@ -194,29 +196,35 @@ export function LandingPagesList() {
   // Read-only Quick View Modal
   const [viewingPage, setViewingPage] = useState<any | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [pageToDelete, setPageToDelete] = useState<any | null>(null);
+  const [isResetBlocksConfirmOpen, setIsResetBlocksConfirmOpen] = useState(false);
 
   // Page level mutations
   const createMutation = useMutation({
     mutationFn: landingPageService.createPage,
-    onSuccess: () => {
+    onSuccess: (res: any) => {
       queryClient.invalidateQueries({ queryKey: ['landing-pages'] });
       setIsWorkspaceOpen(false);
       resetWorkspaceForm();
+      notify.success('Landing Page Created', `Landing page "${res?.name || pageName}" created successfully.`);
     },
     onError: (err: any) => {
       setFormError(err.response?.data?.error?.message || 'Failed to create landing page.');
+      notify.apiError(err, 'Failed to create landing page.');
     }
   });
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: any }) => landingPageService.updatePage(id, data),
-    onSuccess: () => {
+    onSuccess: (res: any) => {
       queryClient.invalidateQueries({ queryKey: ['landing-pages'] });
       setIsWorkspaceOpen(false);
       resetWorkspaceForm();
+      notify.success('Landing Page Updated', `Landing page "${res?.name || pageName}" updated successfully.`);
     },
     onError: (err: any) => {
       setFormError(err.response?.data?.error?.message || 'Failed to save landing page.');
+      notify.apiError(err, 'Failed to save landing page.');
     }
   });
 
@@ -224,9 +232,12 @@ export function LandingPagesList() {
     mutationFn: landingPageService.deletePage,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['landing-pages'] });
+      notify.success('Landing Page Deleted', `Landing page "${pageToDelete?.name || ''}" deleted.`);
+      setPageToDelete(null);
     },
     onError: (err: any) => {
-      alert(err.response?.data?.error?.message || 'Failed to delete landing page.');
+      notify.apiError(err, 'Failed to delete landing page.');
+      setPageToDelete(null);
     }
   });
 
@@ -755,11 +766,7 @@ export function LandingPagesList() {
                                   id={`delete-page-${page.id}`}
                                   variant="ghost"
                                   size="icon"
-                                  onClick={() => {
-                                    if (confirm(`Are you absolutely sure you want to delete the landing page "${page.name}"?\n\nThis will instantly remove all custom styled blocks!`)) {
-                                      deleteMutation.mutate(page.id);
-                                    }
-                                  }}
+                                  onClick={() => setPageToDelete(page)}
                                   className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
                                   title="Delete Page"
                                 >
@@ -897,11 +904,7 @@ export function LandingPagesList() {
                   </h3>
                   {blocks.length > 0 && (
                     <button
-                      onClick={() => {
-                        if (confirm('Clear all blocks and start with a blank template?')) {
-                          setBlocks([]);
-                        }
-                      }}
+                      onClick={() => setIsResetBlocksConfirmOpen(true)}
                       className="text-[10px] text-muted-foreground hover:text-destructive flex items-center gap-1 font-semibold border px-2 py-0.5 rounded hover:bg-muted"
                     >
                       <RotateCcw className="h-3 w-3" /> Reset Page
@@ -1258,7 +1261,7 @@ export function LandingPagesList() {
                                       <Button
                                         type="button"
                                         variant="outline"
-                                        size="xs"
+                                        size="sm"
                                         onClick={() => handleAddFeatureItem(block.id)}
                                         className="h-6 text-[10px] gap-1 px-2"
                                       >
@@ -1350,7 +1353,7 @@ export function LandingPagesList() {
                                       <Button
                                         type="button"
                                         variant="outline"
-                                        size="xs"
+                                        size="sm"
                                         onClick={() => handleAddFaqItem(block.id)}
                                         className="h-6 text-[10px] gap-1 px-2"
                                       >
@@ -1937,6 +1940,38 @@ export function LandingPagesList() {
           </div>
         </div>
       )}
+
+      {/* Delete Landing Page Dialog */}
+      <ConfirmDialog
+        isOpen={!!pageToDelete}
+        onOpenChange={(open) => !open && setPageToDelete(null)}
+        title="Delete Landing Page"
+        description={
+          <>
+            Are you sure you want to delete the landing page <strong>"{pageToDelete?.name}"</strong>?
+            This will permanently remove all custom styled blocks.
+          </>
+        }
+        confirmText="Delete Page"
+        variant="destructive"
+        isLoading={deleteMutation.isPending}
+        onConfirm={() => pageToDelete && deleteMutation.mutate(pageToDelete.id)}
+      />
+
+      {/* Reset Layout Blocks Dialog */}
+      <ConfirmDialog
+        isOpen={isResetBlocksConfirmOpen}
+        onOpenChange={(open) => !open && setIsResetBlocksConfirmOpen(false)}
+        title="Reset Page Blocks"
+        description="Are you sure you want to clear all blocks and start with a blank template? Any unsaved edits will be lost."
+        confirmText="Clear All Blocks"
+        variant="destructive"
+        onConfirm={() => {
+          setBlocks([]);
+          setIsResetBlocksConfirmOpen(false);
+          notify.info('Blocks Cleared', 'Layout has been reset to blank.');
+        }}
+      />
     </div>
   );
 }

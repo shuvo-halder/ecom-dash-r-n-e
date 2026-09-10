@@ -10,4 +10,6 @@ router.get("/", requirePermission("Payments", "read"), PaymentController.getPaym
 router.get("/:id", requirePermission("Payments", "read"), PaymentController.getPaymentById);
 router.put("/:id", requirePermission("Payments", "write"), PaymentController.updatePaymentStatus);
 
+router.delete("/:id", requirePermission("Payments", "write"), PaymentController.deletePayment);
+
 export default router;

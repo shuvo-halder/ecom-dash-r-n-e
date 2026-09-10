@@ -47,7 +47,7 @@ export const trackViewItemList = (items: GA4Item[], listId?: string, listName?: 
   });
 };
 
-export const trackViewItem = (item: GA4Item, value: number, currency = "USD") => {
+export const trackViewItem = (item: GA4Item, value: number, currency = "BDT") => {
   pushToDataLayer("view_item", {
     currency,
     value,
@@ -65,7 +65,7 @@ export const trackSelectItem = (item: GA4Item, listId?: string, listName?: strin
 
 // --- Cart Events ---
 
-export const trackAddToCart = (item: GA4Item, value: number, currency = "USD") => {
+export const trackAddToCart = (item: GA4Item, value: number, currency = "BDT") => {
   pushToDataLayer("add_to_cart", {
     currency,
     value,
@@ -73,7 +73,7 @@ export const trackAddToCart = (item: GA4Item, value: number, currency = "USD") =
   });
 };
 
-export const trackRemoveFromCart = (item: GA4Item, value: number, currency = "USD") => {
+export const trackRemoveFromCart = (item: GA4Item, value: number, currency = "BDT") => {
   pushToDataLayer("remove_from_cart", {
     currency,
     value,
@@ -81,7 +81,7 @@ export const trackRemoveFromCart = (item: GA4Item, value: number, currency = "US
   });
 };
 
-export const trackViewCart = (items: GA4Item[], value: number, currency = "USD") => {
+export const trackViewCart = (items: GA4Item[], value: number, currency = "BDT") => {
   pushToDataLayer("view_cart", {
     currency,
     value,
@@ -91,7 +91,7 @@ export const trackViewCart = (items: GA4Item[], value: number, currency = "USD")
 
 // --- Checkout Events ---
 
-export const trackBeginCheckout = (items: GA4Item[], value: number, currency = "USD") => {
+export const trackBeginCheckout = (items: GA4Item[], value: number, currency = "BDT") => {
   pushToDataLayer("begin_checkout", {
     currency,
     value,
@@ -99,7 +99,7 @@ export const trackBeginCheckout = (items: GA4Item[], value: number, currency = "
   });
 };
 
-export const trackAddShippingInfo = (items: GA4Item[], value: number, shippingTier: string, currency = "USD") => {
+export const trackAddShippingInfo = (items: GA4Item[], value: number, shippingTier: string, currency = "BDT") => {
   pushToDataLayer("add_shipping_info", {
     currency,
     value,
@@ -108,7 +108,7 @@ export const trackAddShippingInfo = (items: GA4Item[], value: number, shippingTi
   });
 };
 
-export const trackAddPaymentInfo = (items: GA4Item[], value: number, paymentType: string, currency = "USD") => {
+export const trackAddPaymentInfo = (items: GA4Item[], value: number, paymentType: string, currency = "BDT") => {
   pushToDataLayer("add_payment_info", {
     currency,
     value,
@@ -132,7 +132,7 @@ export interface PurchaseData {
 
 export const trackPurchase = (data: PurchaseData) => {
   pushToDataLayer("purchase", {
-    currency: data.currency || "USD",
+    currency: data.currency || "BDT",
     transaction_id: data.transaction_id,
     affiliation: data.affiliation,
     value: data.value,
@@ -145,7 +145,7 @@ export const trackPurchase = (data: PurchaseData) => {
 
 export const trackRefund = (data: PurchaseData) => {
   pushToDataLayer("refund", {
-    currency: data.currency || "USD",
+    currency: data.currency || "BDT",
     transaction_id: data.transaction_id,
     affiliation: data.affiliation,
     value: data.value,

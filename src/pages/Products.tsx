@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
@@ -7,15 +7,18 @@ import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Badge } from '@/src/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/src/components/ui/dropdown-menu';
-import { Plus, Search, MoreHorizontal, Edit, Eye, Trash2 } from 'lucide-react';
+import { Plus, Search, MoreHorizontal, Edit, Eye, Trash2, Archive } from 'lucide-react';
 import { getProducts, deleteProduct } from '../services/product.service';
 import { PermissionGuard } from '../components/layout/PermissionGuard';
 import { useAuth } from '../context/AuthContext';
+import { ConfirmDialog } from '../components/common/ConfirmDialog';
+import { notify } from '../lib/notify';
 
 export function Products() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { hasPermission } = useAuth();
+  const [productToDelete, setProductToDelete] = useState<{ id: string; name: string } | null>(null);
 
   const { data: products = [], isLoading } = useQuery<any[]>({
     queryKey: ['products'],
@@ -26,12 +29,17 @@ export function Products() {
     mutationFn: deleteProduct,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
+      notify.success('Product Deleted', `"${productToDelete?.name || 'Product'}" has been permanently removed.`);
+      setProductToDelete(null);
+    },
+    onError: (err) => {
+      notify.apiError(err, 'Failed to delete product.');
     },
   });
 
-  const handleDelete = (id: string) => {
-    if (window.confirm('Are you sure you want to delete this product?')) {
-      deleteMutation.mutate(id);
+  const handleConfirmDelete = () => {
+    if (productToDelete) {
+      deleteMutation.mutate(productToDelete.id);
     }
   };
 
@@ -62,6 +70,14 @@ export function Products() {
               <Input type="search" aria-label="Search products" placeholder="Search products..." className="pl-8" />
             </div>
             <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => navigate('/admin/archive?entityType=products')}
+                className="gap-1.5"
+              >
+                <Archive className="h-3.5 w-3.5 text-muted-foreground" /> Archived Products
+              </Button>
               <Button variant="outline" size="sm">Filter</Button>
               <Button variant="outline" size="sm">Export</Button>
             </div>
@@ -113,7 +129,7 @@ export function Products() {
                         </div>
                       </TableCell>
                       <TableCell className="text-muted-foreground">{product.sku || 'N/A'}</TableCell>
-                      <TableCell>${product.price ? Number(product.price).toFixed(2) : '0.00'}</TableCell>
+                      <TableCell>৳{product.price ? Number(product.price).toFixed(2) : '0.00'}</TableCell>
                       <TableCell>{product.inventory?.quantity || 0}</TableCell>
                       <TableCell>
                         <Badge variant={product.status === 'Active' ? 'success' : 'secondary'}>
@@ -141,7 +157,7 @@ export function Products() {
                               )}
                               {hasDelete && (
                                 <DropdownMenuItem 
-                                  onClick={() => handleDelete(product.id)}
+                                  onClick={() => setProductToDelete({ id: product.id, name: product.name })}
                                   className="text-destructive focus:bg-destructive focus:text-destructive-foreground"
                                 >
                                   <Trash2 className="mr-2 h-4 w-4" />
@@ -160,6 +176,22 @@ export function Products() {
           </Table>
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        isOpen={!!productToDelete}
+        onOpenChange={(open) => !open && setProductToDelete(null)}
+        title="Delete Product"
+        description={
+          <>
+            Are you sure you want to permanently delete <strong>{productToDelete?.name}</strong>? This action cannot be undone and will remove associated inventory records.
+          </>
+        }
+        confirmText="Delete Product"
+        variant="destructive"
+        isLoading={deleteMutation.isPending}
+        onConfirm={handleConfirmDelete}
+      />
     </div>
   );
 }
+

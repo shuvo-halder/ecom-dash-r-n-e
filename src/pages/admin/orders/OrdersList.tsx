@@ -17,13 +17,15 @@ import {
   Clock,
   Package,
   Truck,
+  Trash2,
   XCircle,
   RotateCcw
 } from "lucide-react";
-import { getOrders, updateOrderStatus } from "../../../services/order.service";
+import { getOrders, updateOrderStatus, deleteOrder } from "../../../services/order.service";
 import { Button } from "../../../components/ui/button";
 import { Input } from "../../../components/ui/input";
 import { useAuth } from "../../../context/AuthContext";
+import { notify } from "../../../lib/notify";
 
 export function OrdersList() {
   const navigate = useNavigate();
@@ -102,6 +104,17 @@ export function OrdersList() {
     setStatusModalOpen(true);
   };
 
+  const handleDeleteOrder = async (id: string) => {
+    if (!window.confirm("Are you sure you want to archive this order and all related operational records?")) return;
+    try {
+      await deleteOrder(id);
+      notify.success("Order archived successfully.");
+      fetchOrders();
+    } catch (err: any) {
+      notify.apiError(err, "Failed to archive order.");
+    }
+  };
+
   const handleUpdateStatus = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedOrder) return;
@@ -112,9 +125,10 @@ export function OrdersList() {
         paymentStatus: newPaymentStatus,
       });
       setStatusModalOpen(false);
+      notify.success("Order Updated", `Order #${selectedOrder.orderNumber || selectedOrder.id.slice(0, 8)} status set to ${newStatus}.`);
       fetchOrders();
     } catch (err: any) {
-      alert(err.response?.data?.message || "Failed to update status.");
+      notify.apiError(err, "Failed to update order status.");
     } finally {
       setUpdating(false);
     }
@@ -302,7 +316,7 @@ export function OrdersList() {
                       {order.items?.length || 0} {order.items?.length === 1 ? "item" : "items"}
                     </td>
                     <td className="px-4 py-3 font-semibold text-foreground">
-                      ${Number(order.totalAmount || 0).toFixed(2)}
+                      ৳{Number(order.totalAmount || 0).toFixed(2)}
                     </td>
                     <td className="px-4 py-3 text-xs text-muted-foreground">
                       {new Date(order.createdAt).toLocaleDateString()}
@@ -336,6 +350,16 @@ export function OrdersList() {
                           <Printer className="w-4 h-4 text-muted-foreground" />
                         </Button>
                       </div>
+                        {hasPermission("Orders", "write") && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteOrder(order.id)}
+                            title="Archive Order"
+                          >
+                            <Trash2 className="w-4 h-4 text-rose-500" />
+                          </Button>
+                        )}
                     </td>
                   </tr>
                 ))}
@@ -490,8 +514,8 @@ export function OrdersList() {
                     <tr key={idx}>
                       <td className="py-2 px-2 font-medium">{item.product?.name || "Product"}</td>
                       <td className="py-2 px-2 text-center">{item.quantity}</td>
-                      {printType === "invoice" && <td className="py-2 px-2 text-right">${Number(item.price).toFixed(2)}</td>}
-                      {printType === "invoice" && <td className="py-2 px-2 text-right">${(item.quantity * Number(item.price)).toFixed(2)}</td>}
+                      {printType === "invoice" && <td className="py-2 px-2 text-right">৳{Number(item.price).toFixed(2)}</td>}
+                      {printType === "invoice" && <td className="py-2 px-2 text-right">৳{(item.quantity * Number(item.price)).toFixed(2)}</td>}
                     </tr>
                   ))}
                 </tbody>
@@ -502,7 +526,7 @@ export function OrdersList() {
                   <div className="w-48 space-y-1">
                     <div className="flex justify-between font-bold text-base border-t pt-1">
                       <span>Total Amount:</span>
-                      <span className="text-primary">${Number(printOrder.totalAmount || 0).toFixed(2)}</span>
+                      <span className="text-primary">৳{Number(printOrder.totalAmount || 0).toFixed(2)}</span>
                     </div>
                   </div>
                 </div>

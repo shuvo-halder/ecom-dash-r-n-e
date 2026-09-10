@@ -5,6 +5,7 @@ import { GA4MappingService } from "../services/ga4.service";
 import { validateGA4EventParams } from "../../lib/ga4-ecommerce";
 import { AppError } from "../utils/AppError";
 import { ProductMediaService } from "../services/product-media.service";
+import { sanitizeRichText } from "../utils/richTextSanitizer";
 
 const generateSlug = (name: string) => {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, "");
@@ -138,8 +139,8 @@ export const createProduct = asyncHandler(async (req: Request, res: Response) =>
     data: {
       name,
       slug: generatedSlug,
-      description,
-      shortDescription,
+      description: description ? sanitizeRichText(description) : description,
+      shortDescription: shortDescription ? sanitizeRichText(shortDescription) : shortDescription,
       categoryId: finalCategoryId,
       brandId: brandId || null,
       metaTitle,
@@ -234,8 +235,8 @@ export const updateProduct = asyncHandler(async (req: Request, res: Response) =>
     data: {
       name,
       ...(slug && slug !== existingProduct.slug && { slug }),
-      description,
-      shortDescription,
+      description: description !== undefined ? (description ? sanitizeRichText(description) : description) : undefined,
+      shortDescription: shortDescription !== undefined ? (shortDescription ? sanitizeRichText(shortDescription) : shortDescription) : undefined,
       categoryId: finalCategoryId,
       brandId: brandId || null,
       metaTitle,

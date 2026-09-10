@@ -5,10 +5,13 @@ import {
   updateCartItem,
   removeCartItem,
   clearCart,
+  applyCartCoupon,
+  removeCartCoupon,
 } from "../../controllers/storefront/cart.controller";
 import { optionalCustomerAuth } from "../../middlewares/customerAuth";
 import { validateBody, validateParamsUUID } from "../../middlewares/validation";
 import { addCartItemSchema, updateCartItemSchema } from "../../validators/cart.validator";
+import { applyCouponSchema } from "../../validators/checkout.validator";
 
 const router = express.Router();
 
@@ -25,6 +28,10 @@ router.put("/item/:id", validateParamsUUID(["id"]), validateBody(updateCartItemS
 
 router.delete("/items/:id", validateParamsUUID(["id"]), removeCartItem);
 router.delete("/item/:id", validateParamsUUID(["id"]), removeCartItem);
+
+router.post("/coupon", validateBody(applyCouponSchema), applyCartCoupon);
+router.delete("/coupon", removeCartCoupon);
+router.post("/coupon/remove", removeCartCoupon);
 
 router.delete("/", clearCart);
 

@@ -1,3 +1,4 @@
+import { normalizePhone } from "../utils/phone";
 import { Response, NextFunction } from "express";
 import { prisma } from "../config/db";
 import { AuthRequest } from "../middlewares/auth";
@@ -5,6 +6,12 @@ import { AppError } from "../utils/AppError";
 import { AuditService } from "../services/audit.service";
 
 // GET /api/v1/customers
+
+const sanitizeCustomer = (cust: any) => {
+  const { passwordHash, resetPasswordToken, resetPasswordExpires, verificationToken, verificationExpires, pendingEmailVerificationToken, pendingEmailVerificationExpires, ...safeCust } = cust;
+  return safeCust;
+};
+
 export const getCustomers = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { page = 1, limit = 10, search = "" } = req.query;
@@ -53,7 +60,7 @@ export const getCustomers = async (req: AuthRequest, res: Response, next: NextFu
       );
       const lastOrderDate = sortedOrders.length > 0 ? sortedOrders[0].createdAt : null;
 
-      const { orders, ...rest } = cust;
+      const { orders, ...rest } = sanitizeCustomer(cust);
       return {
         ...rest,
         totalOrders,
@@ -121,7 +128,7 @@ export const getCustomerById = async (req: AuthRequest, res: Response, next: Nex
       status: "success",
       data: {
         customer: {
-          ...customer,
+          ...sanitizeCustomer(customer),
           totalOrders,
           lifetimeValue,
           lastOrderDate,
@@ -241,6 +248,61 @@ export const resetCustomerPassword = async (req: AuthRequest, res: Response, nex
     res.status(200).json({
       status: "success",
       message: `Password reset link / token generated for customer ${customer.email}`,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateCustomerMobileStatus = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const { phoneVerified, phone } = req.body;
+    let normalizedPhone = phone;
+    if (normalizedPhone) {
+      normalizedPhone = normalizePhone(normalizedPhone);
+      if (!normalizedPhone) {
+        return next(new AppError("Invalid Bangladesh mobile number format", 400, "BAD_REQUEST"));
+      }
+    }
+
+    const customer = await prisma.customer.findFirst({ where: { id, deletedAt: null } });
+    if (!customer) {
+      return next(new AppError("Customer not found", 404, "NOT_FOUND"));
+    }
+    
+    // Check if new phone conflicts
+    if (normalizedPhone && normalizedPhone !== customer.phone) {
+       const existing = await prisma.customer.findUnique({ where: { phone: normalizedPhone } });
+       if (existing && existing.id !== customer.id) {
+          return next(new AppError("This phone number is already registered to another customer.", 400, "BAD_REQUEST"));
+       }
+    }
+
+    const updatedCustomer = await prisma.customer.update({
+      where: { id },
+      data: { 
+        ...((normalizedPhone !== undefined && normalizedPhone !== null) && { phone: normalizedPhone }),
+        ...(phoneVerified !== undefined && { 
+             phoneVerified, 
+             phoneVerifiedAt: phoneVerified ? new Date() : null 
+        }),
+      },
+    });
+
+    await AuditService.createLog(
+      req.user?.id || null,
+      "UPDATE_CUSTOMER_MOBILE",
+      "Customer",
+      id,
+      null,
+      { phoneVerified, phone: normalizedPhone },
+      req
+    );
+
+    res.status(200).json({
+      status: "success",
+      data: { customer: updatedCustomer },
     });
   } catch (error) {
     next(error);

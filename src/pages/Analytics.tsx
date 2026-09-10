@@ -92,7 +92,7 @@ export function Analytics() {
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${overview?.totalRevenue?.toFixed(2) || '0.00'}</div>
+              <div className="text-2xl font-bold">৳{overview?.totalRevenue?.toFixed(2) || '0.00'}</div>
             </CardContent>
           </Card>
           <Card>
@@ -178,7 +178,7 @@ export function Analytics() {
                 <DollarSign className="h-4 w-4 text-blue-500" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">${ga4?.revenue?.toFixed(2) || '0.00'}</div>
+                <div className="text-2xl font-bold">৳{ga4?.revenue?.toFixed(2) || '0.00'}</div>
               </CardContent>
             </Card>
           </div>
@@ -196,8 +196,8 @@ export function Analytics() {
                 <LineChart data={revenueTrend}>
                   <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
                   <XAxis dataKey="date" fontSize={12} tickMargin={10} />
-                  <YAxis fontSize={12} tickFormatter={(value) => `$${value}`} />
-                  <RechartsTooltip formatter={(value: number) => [`$${value.toFixed(2)}`, 'Revenue']} />
+                  <YAxis fontSize={12} tickFormatter={(value) => `৳${value}`} />
+                  <RechartsTooltip formatter={(value: number) => [`৳${value.toFixed(2)}`, 'Revenue']} />
                   <Line type="monotone" dataKey="revenue" stroke="#3b82f6" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
                 </LineChart>
               </ResponsiveContainer>
@@ -253,8 +253,8 @@ export function Analytics() {
                 <BarChart data={categorySales}>
                   <CartesianGrid strokeDasharray="3 3" opacity={0.2} vertical={false} />
                   <XAxis dataKey="name" fontSize={12} tickMargin={10} />
-                  <YAxis fontSize={12} tickFormatter={(value) => `$${value}`} />
-                  <RechartsTooltip formatter={(value: number) => [`$${value.toFixed(2)}`, 'Sales']} />
+                  <YAxis fontSize={12} tickFormatter={(value) => `৳${value}`} />
+                  <RechartsTooltip formatter={(value: number) => [`৳${value.toFixed(2)}`, 'Sales']} />
                   <Bar dataKey="sales" fill="#8b5cf6" name="Sales" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>

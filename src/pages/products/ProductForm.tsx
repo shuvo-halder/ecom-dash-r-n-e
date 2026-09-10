@@ -8,6 +8,7 @@ import { getBrands } from '../../services/brand.service';
 import { ProductMediaTab } from '@/src/components/products/ProductMediaTab';
 import { ProductImageItem } from '../../services/product.service';
 import { ImageIcon, FileText, Tag, DollarSign, Settings } from 'lucide-react';
+import { RichTextEditor } from '@/src/components/ui/RichTextEditor';
 
 interface ProductFormProps {
   initialData?: any;
@@ -156,18 +157,19 @@ export function ProductForm({ initialData, onSubmit, isLoading }: ProductFormPro
                     name="shortDescription" 
                     value={formData.shortDescription} 
                     onChange={handleChange} 
-                    rows={2}
-                    className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    rows={3}
+                    placeholder="Brief summary of the product..."
+                    className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Description</label>
-                  <textarea 
-                    name="description" 
-                    value={formData.description} 
-                    onChange={handleChange} 
-                    rows={6}
-                    className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  <RichTextEditor
+                    label="Description"
+                    value={formData.description}
+                    onChange={(val) => setFormData((prev) => ({ ...prev, description: val }))}
+                    placeholder="Full product description, features, and specifications..."
+                    minHeight="240px"
+                    folder="products"
                   />
                 </div>
               </CardContent>

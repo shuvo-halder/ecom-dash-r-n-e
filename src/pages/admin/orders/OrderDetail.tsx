@@ -16,7 +16,8 @@ import {
   Truck,
   XCircle,
   RotateCcw,
-  FileText
+  FileText,
+  Banknote
 } from "lucide-react";
 import {
   getOrderById,
@@ -28,6 +29,9 @@ import { getUsers } from "../../../services/user.service";
 import { Button } from "../../../components/ui/button";
 import { Input } from "../../../components/ui/input";
 import { useAuth } from "../../../context/AuthContext";
+import { notify } from "../../../lib/notify";
+import { PathaoShipmentCard } from "../../../components/admin/orders/PathaoShipmentCard";
+import { DeliveryBillingSection } from "../../../components/admin/orders/DeliveryBillingSection";
 
 export function OrderDetail() {
   const { id } = useParams<{ id: string }>();
@@ -95,9 +99,31 @@ export function OrderDetail() {
         paymentStatus: newPaymentStatus,
       });
       setOrder(updated);
-      alert("Order status updated successfully!");
+      setNewStatus(updated.status);
+      setNewPaymentStatus(updated.paymentStatus || "Unpaid");
+      notify.success("Order Updated", `Status changed to ${newStatus} (${newPaymentStatus}).`);
     } catch (err: any) {
-      alert(err.response?.data?.message || "Failed to update status.");
+      notify.apiError(err, "Failed to update order status.");
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
+
+  const handleMarkCodPaid = async () => {
+    if (!id || !order) return;
+    setUpdatingStatus(true);
+    try {
+      const updated = await updateOrderStatus(id, {
+        paymentStatus: "Paid",
+      });
+      setOrder(updated);
+      setNewPaymentStatus(updated.paymentStatus || "Paid");
+      notify.success(
+        "COD Payment Marked as Paid",
+        "Cash on Delivery payment has been marked as Paid and synchronized with financial ledger."
+      );
+    } catch (err: any) {
+      notify.apiError(err, "Failed to mark COD payment as Paid.");
     } finally {
       setUpdatingStatus(false);
     }
@@ -109,9 +135,9 @@ export function OrderDetail() {
       const updated = await assignOrderStaff(id, staffId || null);
       setOrder(updated);
       setSelectedStaff(staffId);
-      alert("Staff assignment updated!");
+      notify.success("Staff Assigned", staffId ? "Staff member has been assigned to this order." : "Staff assignment removed.");
     } catch (err: any) {
-      alert(err.response?.data?.message || "Failed to assign staff.");
+      notify.apiError(err, "Failed to assign staff.");
     }
   };
 
@@ -122,9 +148,10 @@ export function OrderDetail() {
     try {
       await addOrderNote(id, newNote);
       setNewNote("");
+      notify.success("Note Added", "Internal order note recorded.");
       fetchOrderDetails();
     } catch (err: any) {
-      alert(err.response?.data?.message || "Failed to add note.");
+      notify.apiError(err, "Failed to add internal note.");
     } finally {
       setSubmittingNote(false);
     }
@@ -173,6 +200,22 @@ export function OrderDetail() {
       </div>
     );
   }
+
+  const totalAmount = Number(order.totalAmount || 0);
+  const isPaid = order.paymentStatus?.toLowerCase() === "paid";
+  const paidAmount = isPaid
+    ? totalAmount
+    : Array.isArray(order.payments)
+    ? order.payments
+        .filter((p: any) => p.status === "PAID" || p.status === "COMPLETED")
+        .reduce((sum: number, p: any) => sum + (Number(p.amount || 0) - Number(p.refundedAmount || 0)), 0)
+    : 0;
+
+  const dueAmount = isPaid ? 0 : Math.max(0, totalAmount - paidAmount);
+  const isCodOrder = Boolean(
+    order.paymentMethod?.toLowerCase().includes("cod") ||
+    order.paymentMethod?.toLowerCase().includes("cash")
+  );
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
@@ -230,10 +273,10 @@ export function OrderDetail() {
                       </td>
                       <td className="py-3 px-3 text-center font-medium">{item.quantity}</td>
                       <td className="py-3 px-3 text-right text-muted-foreground">
-                        ${Number(item.price).toFixed(2)}
+                        ৳{Number(item.price).toFixed(2)}
                       </td>
                       <td className="py-3 px-3 text-right font-semibold text-foreground">
-                        ${(item.quantity * Number(item.price)).toFixed(2)}
+                        ৳{(item.quantity * Number(item.price)).toFixed(2)}
                       </td>
                     </tr>
                   ))}
@@ -241,17 +284,76 @@ export function OrderDetail() {
               </table>
             </div>
 
-            <div className="border-t pt-3 space-y-1 text-sm text-right">
-              <div className="flex justify-end gap-6 text-muted-foreground">
-                <span>Subtotal:</span>
-                <span className="font-medium text-foreground">${Number(order.totalAmount || 0).toFixed(2)}</span>
-              </div>
-              <div className="flex justify-end gap-6 font-bold text-base text-foreground pt-2 border-t">
-                <span>Total Amount:</span>
-                <span className="text-primary">${Number(order.totalAmount || 0).toFixed(2)}</span>
-              </div>
-            </div>
+            {/* Financial Breakdown */}
+            {(() => {
+              const subtotal =
+                order.subtotal !== undefined && order.subtotal !== null
+                  ? Number(order.subtotal)
+                  : Array.isArray(order.items)
+                  ? order.items.reduce((sum: number, it: any) => sum + (it.quantity || 1) * Number(it.price || 0), 0)
+                  : Number(order.totalAmount || 0);
+
+              const shippingFee = Number(order.shippingFee ?? order.shippingCost ?? 0);
+              const discountAmount = Number(order.discountAmount ?? 0);
+              const taxAmount = Number(order.taxAmount ?? 0);
+              const totalAmount = Number(order.totalAmount || 0);
+
+              const isPaid = order.paymentStatus?.toLowerCase() === "paid";
+              const paidAmount = isPaid
+                ? totalAmount
+                : Array.isArray(order.payments)
+                ? order.payments
+                    .filter((p: any) => p.status === "PAID" || p.status === "COMPLETED")
+                    .reduce((sum: number, p: any) => sum + (Number(p.amount || 0) - Number(p.refundedAmount || 0)), 0)
+                : 0;
+
+              const dueAmount = isPaid ? 0 : Math.max(0, totalAmount - paidAmount);
+
+              return (
+                <div className="border-t pt-4 space-y-2 text-sm">
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>Product Subtotal:</span>
+                    <span className="font-medium text-foreground">৳{subtotal.toFixed(2)}</span>
+                  </div>
+                  {discountAmount > 0 && (
+                    <div className="flex justify-between text-emerald-600">
+                      <span>Discount {order.coupon?.code ? `(${order.coupon.code})` : ""}:</span>
+                      <span className="font-medium">-৳{discountAmount.toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>Shipping Charge:</span>
+                    <span className="font-medium text-foreground">৳{shippingFee.toFixed(2)}</span>
+                  </div>
+                  {taxAmount > 0 && (
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>Tax / VAT:</span>
+                      <span className="font-medium text-foreground">+৳{taxAmount.toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between font-bold text-base text-foreground pt-2 border-t">
+                    <span>Grand Total:</span>
+                    <span className="text-primary">৳{totalAmount.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs pt-1">
+                    <span className="text-muted-foreground">Payment Status:</span>
+                    <span className={`font-semibold ${isPaid ? "text-emerald-600" : "text-amber-600"}`}>
+                      {order.paymentStatus || "Unpaid"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between font-semibold text-sm pt-1 border-t border-dashed">
+                    <span className="text-muted-foreground">Collectable / Due (COD):</span>
+                    <span className={dueAmount > 0 ? "text-foreground font-bold" : "text-muted-foreground"}>
+                      ৳{dueAmount.toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
+
+          {/* Delivery & Billing Section */}
+          <DeliveryBillingSection order={order} />
 
           {/* Timeline Section */}
           <div className="bg-card border rounded-lg p-5 space-y-4 shadow-xs">
@@ -327,6 +429,35 @@ export function OrderDetail() {
           {/* Quick Actions / Status Update */}
           <div className="bg-card border rounded-lg p-5 space-y-4 shadow-xs">
             <h3 className="font-bold text-base">Update Order Status</h3>
+
+            {/* Quick COD Payment Confirmation Action */}
+            {isCodOrder && !isPaid && hasPermission("Orders", "write") && (
+              <div className="bg-amber-500/10 border border-amber-500/20 rounded-md p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-700 dark:text-amber-400">
+                    <Banknote className="w-4 h-4 shrink-0" />
+                    <span>Cash on Delivery (COD)</span>
+                  </div>
+                  <span className="text-xs font-mono font-bold text-foreground">
+                    Due: ৳{dueAmount.toFixed(2)}
+                  </span>
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  Customer paid the COD amount to the delivery person. Click below to record this payment as Paid.
+                </p>
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={updatingStatus}
+                  onClick={handleMarkCodPaid}
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs shadow-xs"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
+                  {updatingStatus ? "Recording..." : "Mark COD Payment as Paid"}
+                </Button>
+              </div>
+            )}
+
             <form onSubmit={handleUpdateStatus} className="space-y-3">
               <div>
                 <label className="block text-xs font-semibold uppercase text-muted-foreground mb-1">
@@ -369,6 +500,13 @@ export function OrderDetail() {
               )}
             </form>
           </div>
+
+          {/* Pathao Courier Dispatch & Shipment Management */}
+          <PathaoShipmentCard
+            order={order}
+            onOrderUpdated={fetchOrderDetails}
+            canManage={hasPermission("Orders", "write")}
+          />
 
           {/* Assign Staff */}
           <div className="bg-card border rounded-lg p-5 space-y-3 shadow-xs">
@@ -422,24 +560,24 @@ export function OrderDetail() {
           {/* Shipping & Billing Address */}
           <div className="bg-card border rounded-lg p-5 space-y-4 shadow-xs">
             <h3 className="font-bold text-base flex items-center gap-2 border-b pb-2">
-              <MapPin className="w-4 h-4 text-primary" /> Delivery & Billing
+              <MapPin className="w-4 h-4 text-primary" /> Addresses & Payment
             </h3>
             <div className="space-y-3 text-xs">
               <div>
                 <p className="font-semibold text-muted-foreground uppercase mb-0.5">Shipping Address</p>
                 <p className="text-foreground whitespace-pre-wrap">
-                  {order.shippingAddress || "123 Tech Blvd, Suite 100, San Francisco, CA 94107"}
+                  {order.shippingAddress || "No shipping address provided"}
                 </p>
               </div>
               <div>
                 <p className="font-semibold text-muted-foreground uppercase mb-0.5">Billing Address</p>
                 <p className="text-foreground whitespace-pre-wrap">
-                  {order.billingAddress || "123 Tech Blvd, Suite 100, San Francisco, CA 94107"}
+                  {order.billingAddress || order.shippingAddress || "Same as shipping address"}
                 </p>
               </div>
               <div>
                 <p className="font-semibold text-muted-foreground uppercase mb-0.5">Payment Method</p>
-                <p className="text-foreground">{order.paymentMethod || "Credit Card"}</p>
+                <p className="text-foreground">{order.paymentMethod || "Cash on Delivery"}</p>
               </div>
             </div>
           </div>
@@ -507,8 +645,8 @@ export function OrderDetail() {
                     <tr key={idx}>
                       <td className="py-2 px-2 font-medium">{item.product?.name || "Product"}</td>
                       <td className="py-2 px-2 text-center">{item.quantity}</td>
-                      {printType === "invoice" && <td className="py-2 px-2 text-right">${Number(item.price).toFixed(2)}</td>}
-                      {printType === "invoice" && <td className="py-2 px-2 text-right">${(item.quantity * Number(item.price)).toFixed(2)}</td>}
+                      {printType === "invoice" && <td className="py-2 px-2 text-right">৳{Number(item.price).toFixed(2)}</td>}
+                      {printType === "invoice" && <td className="py-2 px-2 text-right">৳{(item.quantity * Number(item.price)).toFixed(2)}</td>}
                     </tr>
                   ))}
                 </tbody>
@@ -519,7 +657,7 @@ export function OrderDetail() {
                   <div className="w-48 space-y-1">
                     <div className="flex justify-between font-bold text-base border-t pt-1">
                       <span>Total Amount:</span>
-                      <span className="text-primary">${Number(order.totalAmount || 0).toFixed(2)}</span>
+                      <span className="text-primary">৳{Number(order.totalAmount || 0).toFixed(2)}</span>
                     </div>
                   </div>
                 </div>

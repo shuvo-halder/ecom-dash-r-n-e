@@ -1,8 +1,10 @@
 import { Response, NextFunction } from "express";
+import { Prisma, PaymentStatus, PaymentProvider, RefundStatus } from "@prisma/client";
 import { prisma } from "../config/db";
 import { AuthRequest } from "../middlewares/auth";
 import { AppError } from "../utils/AppError";
 import { AuditService } from "../services/audit.service";
+import { emailService } from "../services/email.service";
 import { MeasurementProtocolService } from "../services/measurement-protocol.service";
 
 // GET /api/v1/orders
@@ -113,6 +115,15 @@ export const getOrderById = async (req: AuthRequest, res: Response, next: NextFu
             productVariant: true,
           },
         },
+        shipments: {
+          orderBy: { createdAt: "desc" },
+          include: {
+            courier: true,
+            trackingEvents: {
+              orderBy: { timestamp: "desc" },
+            },
+          },
+        },
         timeline: {
           orderBy: { createdAt: "asc" },
         },
@@ -120,6 +131,12 @@ export const getOrderById = async (req: AuthRequest, res: Response, next: NextFu
           orderBy: { createdAt: "desc" },
         },
         coupon: true,
+        payments: {
+          orderBy: { createdAt: "desc" },
+        },
+        refunds: {
+          orderBy: { createdAt: "desc" },
+        },
       },
     });
 
@@ -178,34 +195,321 @@ export const updateOrderStatus = async (req: AuthRequest, res: Response, next: N
       updateData.internalNotes = internalNotes;
     }
 
-    if (status === "Cancelled" && existingOrder.status !== "Cancelled") {
-      // Restore inventory
-      const orderItems = await prisma.orderItem.findMany({ where: { orderId: id } });
-      for (const item of orderItems) {
-        if (item.productVariantId) {
-          const inv = await prisma.inventory.findFirst({ where: { variantId: item.productVariantId } });
-          if (inv) await prisma.inventory.update({ where: { id: inv.id }, data: { quantityAvailable: { increment: item.quantity } } });
-        } else {
-          const inv = await prisma.inventory.findFirst({ where: { productId: item.productId } });
-          if (inv) await prisma.inventory.update({ where: { id: inv.id }, data: { quantityAvailable: { increment: item.quantity } } });
-        }
-      }
+    if (Object.keys(updateData).length === 0 && timelineEntries.length === 0) {
+      return res.status(200).json({ status: "success", data: { order: existingOrder } });
     }
 
-    const updatedOrder = await prisma.order.update({
-      where: { id },
-      data: {
-        ...updateData,
-        timeline: {
-          create: timelineEntries,
+    const updatedOrder = await prisma.$transaction(async (tx) => {
+      // Row lock Order
+      const currentOrder = await tx.order.update({
+        where: { id },
+        data: { updatedAt: new Date() }
+      });
+      if (!currentOrder || currentOrder.deletedAt) throw new AppError("Order not found", 404, "NOT_FOUND");
+
+      // State machine transition validation
+      if (status && status !== currentOrder.status) {
+        if (currentOrder.status === "Cancelled") {
+          throw new AppError("Cannot change status of a Cancelled order", 400, "INVALID_ORDER_STATE");
+        }
+        if (currentOrder.status === "Returned") {
+          throw new AppError("Cannot change status of a Returned order", 400, "INVALID_ORDER_STATE");
+        }
+        if (currentOrder.status === "Shipped" && status !== "Delivered") {
+          throw new AppError(`Cannot transition order from Shipped to ${status}`, 400, "INVALID_ORDER_STATE");
+        }
+        if (currentOrder.status === "Delivered" && status !== "Returned") {
+          throw new AppError(`Cannot transition order from Delivered to ${status}`, 400, "INVALID_ORDER_STATE");
+        }
+      }
+
+      if (status === "Cancelled" && currentOrder.status !== "Cancelled") {
+        const lowerStatus = currentOrder.status.toLowerCase();
+        if (lowerStatus === "shipped" || lowerStatus === "delivered") {
+          throw new AppError(`Cannot cancel an order that is already ${currentOrder.status}`, 400, "INVALID_ORDER_STATE");
+        }
+
+        // Financial lifecycle state management on cancellation
+        const payments = await tx.payment.findMany({ where: { orderId: id } });
+        if (payments.length > 0) {
+          for (const payment of payments) {
+            // Lock authoritative Payment row FIRST before checking or mutating financial status / refunds
+            await tx.$executeRaw`SELECT id FROM "Payment" WHERE id = ${payment.id} FOR UPDATE`;
+            await tx.payment.update({
+              where: { id: payment.id },
+              data: { updatedAt: new Date() },
+            });
+            const lockedPayment = await tx.payment.findUnique({ where: { id: payment.id } });
+            if (!lockedPayment) continue;
+
+            if (lockedPayment.status === PaymentStatus.PENDING || lockedPayment.status === PaymentStatus.PROCESSING) {
+              await tx.payment.update({
+                where: { id: lockedPayment.id },
+                data: { status: PaymentStatus.CANCELLED },
+              });
+
+              await tx.paymentTransaction.create({
+                data: {
+                  paymentId: lockedPayment.id,
+                  status: PaymentStatus.CANCELLED,
+                  responsePayload: { reason: "ORDER_CANCELLED" },
+                },
+              });
+
+              updateData.paymentStatus = "Cancelled";
+            } else if (lockedPayment.status === PaymentStatus.PAID) {
+              const existingRefunds = await tx.refund.findMany({
+                where: { paymentId: lockedPayment.id },
+              });
+
+              // Check if an active cancellation auto-refund already exists
+              const activeCancellationRefund = existingRefunds.find(
+                (r) =>
+                  (r.status === RefundStatus.PENDING || r.status === RefundStatus.PROCESSING) &&
+                  (r.reason === "Order cancellation auto-refund request" || r.reason === "ORDER_CANCELLED")
+              );
+
+              if (!activeCancellationRefund) {
+                const totalReserved = existingRefunds
+                  .filter((r) => r.status === RefundStatus.PENDING || r.status === RefundStatus.PROCESSING)
+                  .reduce((sum, r) => sum.add(r.amount), new Prisma.Decimal(0));
+
+                const remainingRefundable = lockedPayment.amount
+                  .sub(lockedPayment.refundedAmount)
+                  .sub(totalReserved);
+
+                if (remainingRefundable.gt(0)) {
+                  const refund = await tx.refund.create({
+                    data: {
+                      paymentId: lockedPayment.id,
+                      orderId: currentOrder.id,
+                      customerId: currentOrder.customerId,
+                      amount: remainingRefundable,
+                      currency: lockedPayment.currency,
+                      status: RefundStatus.PENDING,
+                      reason: "Order cancellation auto-refund request",
+                    },
+                  });
+
+                  await tx.refundTransaction.create({
+                    data: {
+                      refundId: refund.id,
+                      status: RefundStatus.PENDING,
+                      requestPayload: { reason: "ORDER_CANCELLED", amount: remainingRefundable.toString() },
+                    },
+                  });
+                }
+              }
+            }
+          }
+        } else {
+          updateData.paymentStatus = "Cancelled";
+        }
+
+        // Restore inventory
+        const orderItems = await tx.orderItem.findMany({ where: { orderId: id } });
+        for (const item of orderItems) {
+          if (item.warehouseId) {
+            let inv;
+            if (item.productVariantId) {
+              inv = await tx.inventory.findFirst({
+                where: { warehouseId: item.warehouseId, variantId: item.productVariantId }
+              });
+            } else {
+              inv = await tx.inventory.findFirst({
+                where: { warehouseId: item.warehouseId, productId: item.productId }
+              });
+            }
+
+            if (!inv) {
+              throw new AppError(`No inventory record found for warehouse ${item.warehouseId} to restock.`, 409, "INVENTORY_NOT_FOUND");
+            }
+
+            await tx.inventory.update({
+              where: { id: inv.id },
+              data: { quantityAvailable: { increment: item.quantity } }
+            });
+          } else {
+            // Historical order fallback with NULL warehouseId
+            let matchingInventories;
+            if (item.productVariantId) {
+              matchingInventories = await tx.inventory.findMany({
+                where: { variantId: item.productVariantId }
+              });
+            } else {
+              matchingInventories = await tx.inventory.findMany({
+                where: { productId: item.productId }
+              });
+            }
+
+            if (matchingInventories.length === 0) {
+              throw new AppError(`No inventory record found to restock.`, 409, "INVENTORY_NOT_FOUND");
+            } else if (matchingInventories.length === 1) {
+              await tx.inventory.update({
+                where: { id: matchingInventories[0].id },
+                data: { quantityAvailable: { increment: item.quantity } }
+              });
+            } else {
+              throw new AppError(
+                `INVENTORY_WAREHOUSE_ORIGIN_UNKNOWN: Cannot determine fulfillment warehouse for historical order with multiple warehouses.`,
+                409,
+                "INVENTORY_WAREHOUSE_ORIGIN_UNKNOWN"
+              );
+            }
+          }
+        }
+
+        // Restore coupon usage count if a coupon was used
+        if (currentOrder.couponId) {
+          await tx.coupon.updateMany({
+            where: { id: currentOrder.couponId, usedCount: { gt: 0 } },
+            data: { usedCount: { decrement: 1 } },
+          });
+        }
+      } else if (status === "Cancelled" && currentOrder.status === "Cancelled") {
+        // Remove status update from updateData if it's already cancelled
+        delete updateData.status;
+        const index = timelineEntries.findIndex(e => e.action.includes("changed from"));
+        if (index !== -1) timelineEntries.splice(index, 1);
+      }
+
+      // Synchronize Payment ledger when paymentStatus is updated
+      if (paymentStatus && paymentStatus !== currentOrder.paymentStatus) {
+        const isTargetPaid = paymentStatus.toLowerCase() === "paid";
+        const isTargetUnpaid = paymentStatus.toLowerCase() === "unpaid";
+
+        if (isTargetPaid) {
+          const payments = await tx.payment.findMany({ where: { orderId: id } });
+
+          if (payments.length > 0) {
+            for (const payment of payments) {
+              if (payment.status === PaymentStatus.PENDING || payment.status === PaymentStatus.PROCESSING) {
+                await tx.payment.update({
+                  where: { id: payment.id },
+                  data: {
+                    status: PaymentStatus.PAID,
+                    paidAt: new Date(),
+                  },
+                });
+
+                await tx.paymentTransaction.create({
+                  data: {
+                    paymentId: payment.id,
+                    status: PaymentStatus.PAID,
+                    responsePayload: {
+                      action: "MANUAL_COD_MARK_PAID",
+                      markedBy: actorName,
+                      note: "COD payment manually marked as PAID by admin",
+                      timestamp: new Date().toISOString(),
+                    },
+                  },
+                });
+              }
+            }
+          } else {
+            // If order has no Payment row, create one for COD tracking
+            let provider: PaymentProvider = PaymentProvider.COD;
+            const pm = (currentOrder.paymentMethod || "").toUpperCase();
+            if (Object.values(PaymentProvider).includes(pm as any)) {
+              provider = pm as PaymentProvider;
+            }
+
+            const newPayment = await tx.payment.create({
+              data: {
+                orderId: id,
+                customerId: currentOrder.customerId || null,
+                provider,
+                amount: currentOrder.totalAmount,
+                currency: "BDT",
+                status: PaymentStatus.PAID,
+                paidAt: new Date(),
+              },
+            });
+
+            await tx.paymentTransaction.create({
+              data: {
+                paymentId: newPayment.id,
+                status: PaymentStatus.PAID,
+                responsePayload: {
+                  action: "MANUAL_COD_MARK_PAID",
+                  markedBy: actorName,
+                  note: "COD payment record created and marked as PAID by admin",
+                  timestamp: new Date().toISOString(),
+                },
+              },
+            });
+          }
+        } else if (isTargetUnpaid) {
+          // Revert payments marked as PAID if no refunds exist
+          const payments = await tx.payment.findMany({
+            where: {
+              orderId: id,
+              status: PaymentStatus.PAID,
+              refundedAmount: { equals: 0 },
+            },
+          });
+
+          for (const payment of payments) {
+            await tx.payment.update({
+              where: { id: payment.id },
+              data: {
+                status: PaymentStatus.PENDING,
+                paidAt: null,
+              },
+            });
+
+            await tx.paymentTransaction.create({
+              data: {
+                paymentId: payment.id,
+                status: PaymentStatus.PENDING,
+                responsePayload: {
+                  action: "MANUAL_COD_MARK_UNPAID",
+                  markedBy: actorName,
+                  note: "Payment status reverted to UNPAID by admin",
+                  timestamp: new Date().toISOString(),
+                },
+              },
+            });
+          }
+        }
+      }
+
+      return await tx.order.update({
+        where: { id },
+        data: {
+          ...updateData,
+          ...(timelineEntries.length > 0 && {
+            timeline: {
+              create: timelineEntries,
+            }
+          }),
         },
-      },
-      include: {
-        customer: true,
-        items: { include: { product: true } },
-        timeline: { orderBy: { createdAt: "asc" } },
-        orderNotes: { orderBy: { createdAt: "desc" } },
-      },
+        include: {
+          customer: {
+            select: { id: true, firstName: true, lastName: true, email: true },
+          },
+          items: {
+            include: {
+              product: true,
+              productVariant: true,
+            },
+          },
+          shipments: {
+            orderBy: { createdAt: "desc" },
+            include: {
+              courier: true,
+              trackingEvents: {
+                orderBy: { timestamp: "desc" },
+              },
+            },
+          },
+          timeline: { orderBy: { createdAt: "asc" } },
+          orderNotes: { orderBy: { createdAt: "desc" } },
+          coupon: true,
+          payments: { orderBy: { createdAt: "desc" } },
+          refunds: { orderBy: { createdAt: "desc" } },
+        },
+      });
     });
 
     await AuditService.createLog(
@@ -217,6 +521,22 @@ export const updateOrderStatus = async (req: AuthRequest, res: Response, next: N
       { oldStatus: existingOrder.status, newStatus: status, paymentStatus },
       req
     );
+
+    const orderEmail = updatedOrder?.customer?.email || updatedOrder?.customerEmail;
+    if (status && status !== existingOrder.status && orderEmail) {
+      try {
+        const emailRecipient = { email: orderEmail, firstName: updatedOrder.customer?.firstName || "Customer" };
+        if (status === "Processing") {
+          emailService.sendOrderProcessingEmail(emailRecipient, updatedOrder).catch(() => {});
+        } else if (status === "Confirmed") {
+          emailService.sendOrderConfirmedEmail(emailRecipient, updatedOrder).catch(() => {});
+        } else if (status === "Cancelled") {
+          emailService.sendOrderCancelledEmail(emailRecipient, updatedOrder).catch(() => {});
+        }
+      } catch (err) {
+        console.error(`[Email Service] Failed to dispatch order status email for ${id}`);
+      }
+    }
 
     if (
       existingOrder.paymentStatus?.toUpperCase() !== "PAID" &&
@@ -352,10 +672,30 @@ export const deleteOrder = async (req: AuthRequest, res: Response, next: NextFun
       return next(new AppError("Order not found", 404, "NOT_FOUND"));
     }
 
-    await prisma.order.update({
-      where: { id },
-      data: { deletedAt: new Date() },
-    });
+    const now = new Date();
+
+    await prisma.$transaction([
+      prisma.order.update({
+        where: { id },
+        data: { deletedAt: now },
+      }),
+      prisma.payment.updateMany({
+        where: { orderId: id, deletedAt: null },
+        data: { deletedAt: now },
+      }),
+      prisma.refund.updateMany({
+        where: { orderId: id, deletedAt: null },
+        data: { deletedAt: now },
+      }),
+      prisma.returnRequest.updateMany({
+        where: { orderId: id, deletedAt: null },
+        data: { deletedAt: now },
+      }),
+      prisma.shipment.updateMany({
+        where: { orderId: id, deletedAt: null },
+        data: { deletedAt: now },
+      })
+    ]);
 
     await AuditService.createLog(
       req.user?.id || null,

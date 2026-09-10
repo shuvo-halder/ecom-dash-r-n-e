@@ -5,6 +5,7 @@ import { ProductForm } from './ProductForm';
 import { createProduct } from '../../services/product.service';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/src/components/ui/button';
+import { notify } from '@/src/lib/notify';
 
 export function ProductCreate() {
   const navigate = useNavigate();
@@ -12,13 +13,13 @@ export function ProductCreate() {
 
   const mutation = useMutation({
     mutationFn: createProduct,
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
+      notify.success('Product Created', `"${data.name || 'Product'}" was successfully added to your catalog.`);
       navigate('/products');
     },
     onError: (error) => {
-      console.error('Failed to create product', error);
-      alert('Failed to create product');
+      notify.apiError(error, 'Failed to create product. Please verify the fields.');
     }
   });
 
@@ -34,3 +35,4 @@ export function ProductCreate() {
     </div>
   );
 }
+

@@ -12,7 +12,8 @@ const getBaseUrl = (req: Request) => {
 
 export const getSitemap = async (req: Request, res: Response, next: any) => {
   try {
-    console.log("getSitemap executed"); const baseUrl = getBaseUrl(req);
+    console.log("getSitemap executed");
+    const baseUrl = getBaseUrl(req);
     
     // Fetch products
     const products = await prisma.product.findMany({
@@ -64,7 +65,8 @@ export const getSitemap = async (req: Request, res: Response, next: any) => {
 
 export const getRobotsTxt = async (req: Request, res: Response, next: any) => {
   try {
-    console.log("getSitemap executed"); const baseUrl = getBaseUrl(req);
+    console.log("getRobotsTxt executed");
+    const baseUrl = getBaseUrl(req);
     const robots = `User-agent: *
 Allow: /
 Disallow: /checkout/

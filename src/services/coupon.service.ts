@@ -8,14 +8,14 @@ export interface Coupon {
   validFrom: string;
   validUntil: string;
   isActive: boolean;
-  minOrderAmount?: number;
-  maxDiscountAmount?: number;
-  usageLimit?: number;
-  usagePerCustomer?: number;
+  minOrderAmount?: number | null;
+  maxDiscountAmount?: number | null;
+  usageLimit?: number | null;
+  usagePerCustomer?: number | null;
   usedCount: number;
-  applicableCategories?: string;
-  applicableProducts?: string;
-  applicableBrands?: string;
+  applicableCategories?: string[] | string | null;
+  applicableProducts?: string[] | string | null;
+  applicableBrands?: string[] | string | null;
   stats?: {
     totalUses: number;
     revenueGenerated: number;
@@ -23,8 +23,29 @@ export interface Coupon {
   };
 }
 
+export interface CouponPagination {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface CouponsResponse {
+  success: boolean;
+  data: Coupon[];
+  pagination?: CouponPagination;
+}
+
 export const couponService = {
-  getAll: async (params?: { search?: string; status?: string }) => {
+  getAll: async (params?: {
+    search?: string;
+    status?: string;
+    discountType?: string;
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: "asc" | "desc";
+  }): Promise<CouponsResponse> => {
     const response = await api.get("/coupons", { params });
     return response.data;
   },

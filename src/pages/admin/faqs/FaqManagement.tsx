@@ -27,6 +27,8 @@ import {
   Filter,
   Layers
 } from 'lucide-react';
+import { ConfirmDialog } from '../../../components/common/ConfirmDialog';
+import { notify } from '../../../lib/notify';
 
 export function FaqManagement() {
   const queryClient = useQueryClient();
@@ -59,6 +61,8 @@ export function FaqManagement() {
   const [isFaqModalOpen, setIsFaqModalOpen] = useState(false);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [editingFaq, setEditingFaq] = useState<any | null>(null);
+  const [faqToDelete, setFaqToDelete] = useState<any | null>(null);
+  const [catToDelete, setCatToDelete] = useState<any | null>(null);
 
   // FAQ Form State
   const [faqQuestion, setFaqQuestion] = useState('');
@@ -80,9 +84,11 @@ export function FaqManagement() {
       queryClient.invalidateQueries({ queryKey: ['faq-list'] });
       setIsFaqModalOpen(false);
       resetFaqForm();
+      notify.success('FAQ Created', 'New FAQ has been added.');
     },
     onError: (err: any) => {
       setFaqFormError(err.response?.data?.error?.message || 'Failed to create FAQ');
+      notify.apiError(err, 'Failed to create FAQ');
     }
   });
 
@@ -92,9 +98,11 @@ export function FaqManagement() {
       queryClient.invalidateQueries({ queryKey: ['faq-list'] });
       setIsFaqModalOpen(false);
       resetFaqForm();
+      notify.success('FAQ Updated', 'FAQ has been updated.');
     },
     onError: (err: any) => {
       setFaqFormError(err.response?.data?.error?.message || 'Failed to update FAQ');
+      notify.apiError(err, 'Failed to update FAQ');
     }
   });
 
@@ -102,9 +110,12 @@ export function FaqManagement() {
     mutationFn: faqService.deleteFaq,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['faq-list'] });
+      notify.success('FAQ Deleted', `FAQ "${faqToDelete?.question || ''}" was deleted.`);
+      setFaqToDelete(null);
     },
     onError: (err: any) => {
-      alert(err.response?.data?.error?.message || 'Failed to delete FAQ');
+      notify.apiError(err, 'Failed to delete FAQ');
+      setFaqToDelete(null);
     }
   });
 
@@ -116,9 +127,11 @@ export function FaqManagement() {
       setNewCatName('');
       setNewCatDesc('');
       setCatFormError(null);
+      notify.success('Category Created', 'FAQ Category added successfully.');
     },
     onError: (err: any) => {
       setCatFormError(err.response?.data?.error?.message || 'Failed to create Category');
+      notify.apiError(err, 'Failed to create Category');
     }
   });
 
@@ -126,9 +139,12 @@ export function FaqManagement() {
     mutationFn: faqService.deleteCategory,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['faq-categories'] });
+      notify.success('Category Deleted', `Category "${catToDelete?.name || ''}" was deleted.`);
+      setCatToDelete(null);
     },
     onError: (err: any) => {
-      alert(err.response?.data?.error?.message || 'Failed to delete category');
+      notify.apiError(err, 'Failed to delete category');
+      setCatToDelete(null);
     }
   });
 
@@ -515,12 +531,9 @@ export function FaqManagement() {
                           id={`delete-faq-${faq.id}`}
                           variant="ghost"
                           size="icon"
-                          onClick={() => {
-                            if (confirm(`Are you sure you want to delete this FAQ?\n\n"${faq.question}"`)) {
-                              deleteFaqMutation.mutate(faq.id);
-                            }
-                          }}
+                          onClick={() => setFaqToDelete(faq)}
                           className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          title="Delete FAQ"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
@@ -792,11 +805,7 @@ export function FaqManagement() {
                               variant="ghost"
                               size="icon"
                               disabled={count > 0 || deleteCategoryMutation.isPending}
-                              onClick={() => {
-                                if (confirm(`Are you sure you want to delete the "${cat.name}" category?`)) {
-                                  deleteCategoryMutation.mutate(cat.id);
-                                }
-                              }}
+                              onClick={() => setCatToDelete(cat)}
                               className="h-8 w-8 text-destructive hover:bg-destructive/10 disabled:opacity-30 disabled:hover:bg-transparent"
                               title={count > 0 ? "Cannot delete category while it has FAQs" : "Delete category"}
                             >
@@ -820,6 +829,41 @@ export function FaqManagement() {
           </div>
         </div>
       )}
+
+      {/* Delete FAQ Dialog */}
+      <ConfirmDialog
+        isOpen={!!faqToDelete}
+        onOpenChange={(open) => !open && setFaqToDelete(null)}
+        title="Delete FAQ"
+        description={
+          <>
+            Are you sure you want to delete this FAQ?
+            {faqToDelete && (
+              <p className="mt-2 font-medium text-foreground italic">"{faqToDelete.question}"</p>
+            )}
+          </>
+        }
+        confirmText="Delete FAQ"
+        variant="destructive"
+        isLoading={deleteFaqMutation.isPending}
+        onConfirm={() => faqToDelete && deleteFaqMutation.mutate(faqToDelete.id)}
+      />
+
+      {/* Delete Category Dialog */}
+      <ConfirmDialog
+        isOpen={!!catToDelete}
+        onOpenChange={(open) => !open && setCatToDelete(null)}
+        title="Delete FAQ Category"
+        description={
+          <>
+            Are you sure you want to delete the <strong>"{catToDelete?.name}"</strong> category?
+          </>
+        }
+        confirmText="Delete Category"
+        variant="destructive"
+        isLoading={deleteCategoryMutation.isPending}
+        onConfirm={() => catToDelete && deleteCategoryMutation.mutate(catToDelete.id)}
+      />
     </div>
   );
 }

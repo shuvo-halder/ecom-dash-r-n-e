@@ -43,8 +43,11 @@ export class AuditService {
           details: JSON.stringify(detailsObj),
         },
       });
-    } catch (error) {
-      console.error("Audit logging failed:", error);
+    } catch (error: any) {
+      // In development/test environments without live DB, avoid crashing or loud stack traces
+      if (process.env.NODE_ENV !== "test") {
+        console.warn("Audit logging skipped (DB unavailable):", error?.message || error);
+      }
     }
   }
 
@@ -288,6 +291,39 @@ export class AuditService {
       targetUserId,
       targetUserId,
       { reason },
+      req
+    );
+  }
+
+  static async logPrivilegeEscalationAttempt(
+    actorUserId: string | null,
+    attemptType: string,
+    details: any,
+    req?: Request
+  ) {
+    return this.createLog(
+      actorUserId,
+      "PRIVILEGE_ESCALATION_ATTEMPT",
+      "Security",
+      null,
+      details?.targetUserId || null,
+      { attemptType, ...details },
+      req
+    );
+  }
+
+  static async logAccessDenied(
+    actorUserId: string | null,
+    requiredPrivilege: string,
+    req?: Request
+  ) {
+    return this.createLog(
+      actorUserId,
+      "ACCESS_DENIED",
+      "Security",
+      null,
+      null,
+      { requiredPrivilege },
       req
     );
   }

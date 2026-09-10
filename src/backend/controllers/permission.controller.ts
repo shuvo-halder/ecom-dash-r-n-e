@@ -3,6 +3,7 @@ import { prisma } from "../config/db";
 import { AppError } from "../utils/AppError";
 import { AuthRequest } from "../middlewares/auth";
 import { AuditService } from "../services/audit.service";
+import { PermissionService } from "../services/permission.service";
 
 // GET /api/v1/permissions
 export const getAllPermissions = async (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -36,16 +37,25 @@ export const updateRolePermissions = async (req: AuthRequest, res: Response, nex
       return next(new AppError("Role not found", 404, "NOT_FOUND"));
     }
 
+    // Protection for SuperAdmin role permissions
+    if (role.name === "SuperAdmin") {
+      await AuditService.logPrivilegeEscalationAttempt(
+        req.user?.id || null,
+        "MODIFY_SUPERADMIN_ROLE_PERMISSIONS",
+        { roleId: id },
+        req
+      );
+      return next(new AppError("SuperAdmin permissions are protected and cannot be modified", 403, "SUPERADMIN_PROTECTED"));
+    }
+
     let targetPermissionIds: string[] = [];
 
     if (Array.isArray(permissionIds)) {
       targetPermissionIds = permissionIds;
     } else if (Array.isArray(permissions)) {
-      // Check if array of objects { module, action } or array of IDs
       if (permissions.length > 0 && typeof permissions[0] === "string") {
         targetPermissionIds = permissions;
       } else if (permissions.length > 0 && typeof permissions[0] === "object") {
-        // Resolve permission IDs from module and action pairs
         const allDbPerms = await prisma.permission.findMany();
         targetPermissionIds = permissions
           .map((pObj: { module: string; action: string }) => {
@@ -62,13 +72,37 @@ export const updateRolePermissions = async (req: AuthRequest, res: Response, nex
       return next(new AppError("permissionIds or permissions array is required", 400, "MISSING_FIELDS"));
     }
 
-    // Verify permission IDs exist
+    // Verify permission IDs exist in database
     const validPerms = await prisma.permission.findMany({
       where: { id: { in: targetPermissionIds } },
       select: { id: true },
     });
 
     const validIds = validPerms.map((p) => p.id);
+
+    // Privilege escalation check: Non-SuperAdmin cannot grant permissions they do not possess
+    if (!PermissionService.isSuperAdmin(req.user)) {
+      const isAuthorized = await PermissionService.validateUserCanAssignPermissions(
+        req.user!,
+        validIds
+      );
+
+      if (!isAuthorized) {
+        await AuditService.logPrivilegeEscalationAttempt(
+          req.user?.id || null,
+          "GRANT_UNHELD_PERMISSIONS_ON_ROLE_UPDATE",
+          { roleId: id, roleName: role.name, targetPermissionIds: validIds },
+          req
+        );
+        return next(
+          new AppError(
+            "Privilege escalation prevented: You cannot grant permissions that you do not possess",
+            403,
+            "PRIVILEGE_ESCALATION_BLOCKED"
+          )
+        );
+      }
+    }
 
     // Update role's permission connections
     const updatedRole = await prisma.role.update({

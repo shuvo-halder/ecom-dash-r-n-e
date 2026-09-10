@@ -2,10 +2,12 @@ import { z } from "zod";
 import { customerStrongPasswordSchema } from "./storefront-auth.validator";
 
 export const updateProfileSchema = z.object({
-  firstName: z.string().min(1, "First name is required"),
-  lastName: z.string().optional().nullable(),
-  phone: z.string().optional().nullable(),
+  firstName: z.string().trim().min(1, "First name cannot be empty").optional(),
+  lastName: z.string().trim().optional().nullable(),
+  avatarUrl: z.string().trim().url("Invalid avatar URL format").optional().nullable(),
 });
+
+export const updateCustomerProfileSchema = updateProfileSchema;
 
 export const updateEmailSchema = z.object({
   newEmail: z.string().email("Invalid email address"),
@@ -35,3 +37,18 @@ export const createAddressSchema = z.object({
 });
 
 export const updateAddressSchema = createAddressSchema.partial();
+
+export const updateNotificationPrefSchema = z.object({
+  email: z.boolean().optional(),
+  sms: z.boolean().optional(),
+  inApp: z.boolean().optional(),
+});
+
+export const requestMobileChangeSchema = z.object({
+  newPhone: z.string().min(1, "New phone is required"),
+});
+
+export const verifyMobileChangeSchema = z.object({
+  newPhone: z.string().min(1, "New phone is required"),
+  otp: z.string().length(6, "OTP must be 6 digits"),
+});

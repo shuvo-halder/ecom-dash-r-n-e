@@ -59,7 +59,7 @@ export const merchantService = {
         link: `https://${host}/products/${product.slug}`,
         image_link: primaryImage,
         availability: inStock ? 'in stock' : 'out of stock',
-        price: product.price ? `${Number(product.price).toFixed(2)} USD` : undefined,
+        price: product.price ? `${Number(product.price).toFixed(2)} BDT` : undefined,
         brand: product.brand?.name,
         condition: product.condition || 'new',
         gtin: product.gtin || undefined,

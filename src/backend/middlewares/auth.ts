@@ -3,6 +3,8 @@ import jwt from "jsonwebtoken";
 import { env } from "../config/env";
 import { AppError } from "../utils/AppError";
 import { prisma } from "../config/db";
+import { PermissionPair, PermissionService } from "../services/permission.service";
+import { AuditService } from "../services/audit.service";
 
 export interface AuthRequest extends Request {
   user?: {
@@ -10,7 +12,7 @@ export interface AuthRequest extends Request {
     email: string;
     roleId: string;
     roleName: string;
-    permissions: Array<{ module: string, action: string }>;
+    permissions: PermissionPair[];
   };
 }
 
@@ -20,7 +22,11 @@ export const requireAuth = async (
   next: NextFunction
 ) => {
   try {
-    let token;
+    if (req.user) {
+      return next();
+    }
+
+    let token: string | undefined;
     if (
       req.headers.authorization &&
       req.headers.authorization.startsWith("Bearer")
@@ -34,18 +40,24 @@ export const requireAuth = async (
       );
     }
 
-    // Part 6 - JWT Hardening (signature, expiration, issuer, audience verification)
+    // JWT Hardening: signature, expiration, issuer, audience verification
     const decoded = jwt.verify(token, env.JWT_SECRET, {
       issuer: "ecommerce-admin-api",
-      audience: "ecommerce-admin-app"
+      audience: "ecommerce-admin-app",
     }) as any;
 
     const currentUser = await prisma.user.findUnique({
       where: { id: decoded.id },
-      include: { role: { include: { permissions: true } } },
+      include: {
+        role: {
+          include: {
+            permissions: true,
+          },
+        },
+      },
     });
 
-    if (!currentUser || !currentUser.isActive) {
+    if (!currentUser || !currentUser.isActive || currentUser.deletedAt) {
       return next(
         new AppError("The user belonging to this token no longer exists or is inactive.", 401, "UNAUTHORIZED")
       );
@@ -55,83 +67,86 @@ export const requireAuth = async (
       id: currentUser.id,
       email: currentUser.email,
       roleId: currentUser.roleId,
-      roleName: currentUser.role.name,
-      permissions: currentUser.role.permissions.map(p => ({ module: p.module, action: p.action })),
+      roleName: currentUser.role?.name || "",
+      permissions: (currentUser.role?.permissions || []).map((p) => ({
+        module: p.module,
+        action: p.action,
+      })),
     };
 
     next();
   } catch (error: any) {
-    // Part 8 & Part 13 - Invalid JWT security logging
     const ip = req.ip || req.socket.remoteAddress || "Unknown";
     console.warn(`[SECURITY] Invalid or malformed JWT Token attempt from IP: ${ip}, error: ${error.message}`);
-    
-    try {
-      await prisma.activityLog.create({
-        data: {
-          userId: null,
-          action: "INVALID_TOKEN",
-          entityType: "Security",
-          entityId: null,
-          ipAddress: (req.headers["x-forwarded-for"] as string) || req.ip || req.socket.remoteAddress || null,
-          details: JSON.stringify({
-            reason: error.message || "JWT verification failed",
-            tokenFragment: req.headers.authorization ? req.headers.authorization.substring(0, 15) + "..." : null,
-            timestamp: new Date().toISOString()
-          })
-        }
-      });
-    } catch (logErr) {
-      console.error("Failed to log invalid token to activity log:", logErr);
-    }
+
+    await AuditService.createLog(
+      null,
+      "INVALID_TOKEN",
+      "Security",
+      null,
+      null,
+      {
+        reason: error.message || "JWT verification failed",
+        tokenFragment: req.headers.authorization ? req.headers.authorization.substring(0, 15) + "..." : null,
+      },
+      req
+    );
 
     return next(new AppError("Invalid or expired token", 401, "UNAUTHORIZED"));
   }
 };
 
-export const requirePermission = (module: string, action: string) => {
+/**
+ * Reusable permission verification middleware.
+ * Supports:
+ * - requirePermission("Products", "read")
+ * - requirePermission("products.read")
+ * - requirePermission("products:create")
+ * - requirePermission({ module: "Products", action: "write" })
+ */
+export const requirePermission = (
+  permissionOrModule: string | PermissionPair,
+  action?: string
+) => {
   return async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       if (!req.user) {
         return next(new AppError("User not authenticated", 401, "UNAUTHORIZED"));
       }
 
-      // SuperAdmin bypasses all permission checks
-      if (req.user.roleName === "SuperAdmin") {
+      // Safe SuperAdmin bypass check directly from database user role
+      if (PermissionService.isSuperAdmin(req.user)) {
         return next();
       }
 
-      const hasPermission = req.user.permissions.some(
-        (p) =>
-          p.module.toLowerCase() === module.toLowerCase() &&
-          (p.action.toLowerCase() === action.toLowerCase() || p.action === "all")
+      const hasPerm = PermissionService.hasPermission(
+        req.user,
+        permissionOrModule,
+        action
       );
 
-      if (!hasPermission) {
-        // Part 8 & Part 13 - Permission denied security logging
-        console.warn(`[SECURITY] Permission Denied for user ${req.user.email} calling action ${action} on module ${module}`);
-        
-        try {
-          await prisma.activityLog.create({
-            data: {
-              userId: req.user.id,
-              action: "ACCESS_DENIED",
-              entityType: "Security",
-              entityId: module,
-              ipAddress: (req.headers["x-forwarded-for"] as string) || req.ip || req.socket.remoteAddress || null,
-              details: JSON.stringify({
-                module,
-                action,
-                reason: "Required privileges missing",
-                timestamp: new Date().toISOString()
-              })
-            }
-          });
-        } catch (logErr) {
-          console.error("Failed to log access denied to activity log:", logErr);
-        }
+      if (!hasPerm) {
+        const requiredStr =
+          action !== undefined && typeof permissionOrModule === "string"
+            ? `${permissionOrModule}.${action}`
+            : JSON.stringify(permissionOrModule);
+
+        console.warn(
+          `[SECURITY] Access Denied: User ${req.user.email} lacks required permission (${requiredStr})`
+        );
+
+        await AuditService.logAccessDenied(
+          req.user.id,
+          requiredStr,
+          req
+        );
 
         return next(
-          new AppError(`You do not have permission (${action} on ${module}) to perform this action`, 403, "FORBIDDEN")
+          new AppError(
+            `You do not have permission (${requiredStr}) to perform this action`,
+            403,
+            "FORBIDDEN"
+          )
         );
       }
 
@@ -142,29 +157,125 @@ export const requirePermission = (module: string, action: string) => {
   };
 };
 
-export const requireSuperAdmin = async (req: AuthRequest, res: Response, next: NextFunction) => {
-  if (!req.user || req.user.roleName !== "SuperAdmin") {
-    // Part 8 & Part 13 - Permission denied logs
+/**
+ * Require AT LEAST ONE permission from a list.
+ */
+export const requireAnyPermission = (
+  permissions: Array<string | PermissionPair | [string, string]>
+) => {
+  return async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      if (!req.user) {
+        return next(new AppError("User not authenticated", 401, "UNAUTHORIZED"));
+      }
+
+      if (PermissionService.isSuperAdmin(req.user)) {
+        return next();
+      }
+
+      const hasPerm = PermissionService.hasAnyPermission(req.user, permissions);
+
+      if (!hasPerm) {
+        const requiredStr = permissions
+          .map((p) => (typeof p === "string" ? p : JSON.stringify(p)))
+          .join(" OR ");
+
+        console.warn(
+          `[SECURITY] Access Denied: User ${req.user.email} lacks any of (${requiredStr})`
+        );
+
+        await AuditService.logAccessDenied(
+          req.user.id,
+          requiredStr,
+          req
+        );
+
+        return next(
+          new AppError(
+            `You do not have permission (${requiredStr}) to perform this action`,
+            403,
+            "FORBIDDEN"
+          )
+        );
+      }
+
+      next();
+    } catch (error) {
+      next(error);
+    }
+  };
+};
+
+/**
+ * Require ALL permissions from a list.
+ */
+export const requireAllPermissions = (
+  permissions: Array<string | PermissionPair | [string, string]>
+) => {
+  return async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      if (!req.user) {
+        return next(new AppError("User not authenticated", 401, "UNAUTHORIZED"));
+      }
+
+      if (PermissionService.isSuperAdmin(req.user)) {
+        return next();
+      }
+
+      const hasPerm = PermissionService.hasAllPermissions(req.user, permissions);
+
+      if (!hasPerm) {
+        const requiredStr = permissions
+          .map((p) => (typeof p === "string" ? p : JSON.stringify(p)))
+          .join(" AND ");
+
+        console.warn(
+          `[SECURITY] Access Denied: User ${req.user.email} lacks all required permissions (${requiredStr})`
+        );
+
+        await AuditService.logAccessDenied(
+          req.user.id,
+          requiredStr,
+          req
+        );
+
+        return next(
+          new AppError(
+            `You do not have required permissions (${requiredStr}) to perform this action`,
+            403,
+            "FORBIDDEN"
+          )
+        );
+      }
+
+      next();
+    } catch (error) {
+      next(error);
+    }
+  };
+};
+
+/**
+ * Require genuine SuperAdmin role.
+ */
+export const requireSuperAdmin = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  if (!req.user || !PermissionService.isSuperAdmin(req.user)) {
     const userId = req.user?.id || null;
     console.warn(`[SECURITY] SuperAdmin access denied for user ${req.user?.email || "Anonymous"}`);
-    
-    try {
-      await prisma.activityLog.create({
-        data: {
-          userId,
-          action: "ACCESS_DENIED",
-          entityType: "Security",
-          entityId: "SuperAdminModule",
-          ipAddress: (req.headers["x-forwarded-for"] as string) || req.ip || req.socket.remoteAddress || null,
-          details: JSON.stringify({
-            reason: "SuperAdmin authorization required",
-            timestamp: new Date().toISOString()
-          })
-        }
-      });
-    } catch (logErr) {
-      console.error("Failed to log access denied to activity log:", logErr);
-    }
+
+    await AuditService.logPrivilegeEscalationAttempt(
+      userId,
+      "UNAUTHORIZED_SUPERADMIN_ENDPOINT_ACCESS",
+      {
+        path: req.originalUrl,
+        method: req.method,
+      },
+      req
+    );
 
     return next(new AppError("Only SuperAdmin can perform this action", 403, "FORBIDDEN"));
   }

@@ -5,11 +5,14 @@ import { Layers, Plus, Trash2, Edit3, Power, CheckCircle2, XCircle, Clock, Tag }
 import { Button } from '../../../components/ui/button';
 import { Card } from '../../../components/ui/card';
 import { MediaUploaderInput } from '../../../components/admin/MediaUploaderInput';
+import { ConfirmDialog } from '../../../components/common/ConfirmDialog';
+import { notify } from '../../../lib/notify';
 
 export function PopupsList() {
   const queryClient = useQueryClient();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPopup, setEditingPopup] = useState<Popup | null>(null);
+  const [popupToDelete, setPopupToDelete] = useState<Popup | null>(null);
 
   const [formData, setFormData] = useState({
     title: '',
@@ -31,26 +34,35 @@ export function PopupsList() {
 
   const createMutation = useMutation({
     mutationFn: (data: Partial<Popup>) => popupService.create(data),
-    onSuccess: () => {
+    onSuccess: (res: any) => {
       queryClient.invalidateQueries({ queryKey: ['popups'] });
       setIsModalOpen(false);
       resetForm();
+      notify.success('Popup Created', `Popup "${res?.title || formData.title}" created.`);
     },
+    onError: (err) => notify.apiError(err, 'Failed to create popup.')
   });
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: Partial<Popup> }) => popupService.update(id, data),
-    onSuccess: () => {
+    onSuccess: (res: any) => {
       queryClient.invalidateQueries({ queryKey: ['popups'] });
       setIsModalOpen(false);
       setEditingPopup(null);
       resetForm();
+      notify.success('Popup Updated', `Popup "${res?.title || 'Popup'}" updated.`);
     },
+    onError: (err) => notify.apiError(err, 'Failed to update popup.')
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => popupService.delete(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['popups'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['popups'] });
+      notify.success('Popup Deleted', `Popup "${popupToDelete?.title || 'Popup'}" was deleted.`);
+      setPopupToDelete(null);
+    },
+    onError: (err) => notify.apiError(err, 'Failed to delete popup.')
   });
 
   const resetForm = () => {
@@ -160,9 +172,7 @@ export function PopupsList() {
                         <Button size="icon" variant="ghost" onClick={() => handleEdit(p)}>
                           <Edit3 className="h-4 w-4 text-muted-foreground" />
                         </Button>
-                        <Button size="icon" variant="ghost" onClick={() => {
-                          if (confirm(`Delete popup ${p.title}?`)) deleteMutation.mutate(p.id);
-                        }}>
+                        <Button size="icon" variant="ghost" title="Delete Popup" onClick={() => setPopupToDelete(p)}>
                           <Trash2 className="h-4 w-4 text-rose-500" />
                         </Button>
                       </div>
@@ -282,6 +292,21 @@ export function PopupsList() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={!!popupToDelete}
+        onOpenChange={(open) => !open && setPopupToDelete(null)}
+        title="Delete Popup"
+        description={
+          <>
+            Are you sure you want to delete popup overlay <strong>{popupToDelete?.title}</strong>?
+          </>
+        }
+        confirmText="Delete Popup"
+        variant="destructive"
+        isLoading={deleteMutation.isPending}
+        onConfirm={() => popupToDelete && deleteMutation.mutate(popupToDelete.id)}
+      />
     </div>
   );
 }

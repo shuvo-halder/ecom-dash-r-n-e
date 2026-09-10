@@ -25,7 +25,7 @@ export function GA4Example() {
 
   const handleViewItem = () => {
     trackViewItem({
-      currency: 'USD',
+      currency: 'BDT',
       value: 9.99,
       items: [sampleProduct]
     });
@@ -34,7 +34,7 @@ export function GA4Example() {
 
   const handleAddToCart = () => {
     trackAddToCart({
-      currency: 'USD',
+      currency: 'BDT',
       value: 9.99,
       items: [sampleProduct]
     });
@@ -43,7 +43,7 @@ export function GA4Example() {
 
   const handleBeginCheckout = () => {
     trackBeginCheckout({
-      currency: 'USD',
+      currency: 'BDT',
       value: 9.99,
       coupon: 'SUMMER_FUN',
       items: [sampleProduct]
@@ -58,7 +58,7 @@ export function GA4Example() {
       value: 25.42,
       tax: 4.90,
       shipping: 5.99,
-      currency: 'USD',
+      currency: 'BDT',
       coupon: 'SUMMER_SALE',
       items: [sampleProduct]
     });

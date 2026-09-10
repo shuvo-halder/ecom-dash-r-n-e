@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { asyncHandler } from "../utils/asyncHandler";
 import { prisma } from "../config/db";
 import { AppError } from "../utils/AppError";
+import { sanitizeRichText } from "../utils/richTextSanitizer";
 
 const generateSlug = (name: string) => {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, "");
@@ -86,7 +87,7 @@ export const createCategory = asyncHandler(async (req: Request, res: Response) =
   const createData: any = {
     name,
     slug,
-    description,
+    description: description ? sanitizeRichText(description) : description,
     image,
     icon,
     sortOrder: sortOrder ? parseInt(sortOrder) : 0,
@@ -126,7 +127,7 @@ export const updateCategory = asyncHandler(async (req: Request, res: Response) =
   const updateData: any = {
     name,
     ...(name && { slug: generateSlug(name) + "-" + Math.random().toString(36).substring(2, 6) }),
-    description,
+    description: description !== undefined ? (description ? sanitizeRichText(description) : description) : undefined,
     image,
     icon,
     sortOrder: sortOrder !== undefined ? parseInt(sortOrder) : existingCategory.sortOrder,

@@ -1,5 +1,7 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "../../config/db";
 import { AppError } from "../../utils/AppError";
+import { calculateCouponDiscount } from "../../utils/couponCalculator";
 
 export interface CartIdentifier {
   customerId?: string;
@@ -17,15 +19,15 @@ export class StorefrontCartService {
     throw new AppError("A customer ID or cart session ID is required", 400, "BAD_REQUEST");
   }
 
-  static async getCart(identifier: CartIdentifier) {
+  static async getCart(identifier: CartIdentifier, dbClient: any = prisma) {
     const whereClause = this.getCartWhereClause(identifier);
 
     // If both customerId and sessionId are present, merge guest cart into customer cart
     if (identifier.customerId && identifier.sessionId) {
-      await this.mergeGuestCart(identifier.sessionId, identifier.customerId);
+      await this.mergeGuestCart(identifier.sessionId, identifier.customerId, dbClient);
     }
 
-    let cart = await prisma.cart.findFirst({
+    let cart = await dbClient.cart.findFirst({
       where: whereClause,
       include: {
         items: {
@@ -36,6 +38,8 @@ export class StorefrontCartService {
                 name: true,
                 slug: true,
                 price: true,
+                categoryId: true,
+                brandId: true,
                 isActive: true,
                 status: true,
                 deletedAt: true,
@@ -76,7 +80,7 @@ export class StorefrontCartService {
     });
 
     if (!cart) {
-      cart = await prisma.cart.create({
+      cart = await dbClient.cart.create({
         data: identifier.customerId
           ? { customerId: identifier.customerId }
           : { sessionId: identifier.sessionId! },
@@ -89,6 +93,8 @@ export class StorefrontCartService {
                   name: true,
                   slug: true,
                   price: true,
+                  categoryId: true,
+                  brandId: true,
                   isActive: true,
                   status: true,
                   deletedAt: true,
@@ -164,16 +170,77 @@ export class StorefrontCartService {
 
     const itemCount = itemsWithPricing.reduce((sum, item) => sum + item.quantity, 0);
 
+    let discount = 0;
+    let appliedCoupon: any = null;
+
+    if (cart.couponId) {
+      const coupon = await dbClient.coupon.findFirst({
+        where: { id: cart.couponId, deletedAt: null },
+      });
+
+      if (coupon) {
+        let customerOrderCountWithCoupon = 0;
+        if (coupon.usagePerCustomer !== null && identifier.customerId) {
+          customerOrderCountWithCoupon = await dbClient.order.count({
+            where: {
+              couponId: coupon.id,
+              customerId: identifier.customerId,
+              status: { not: "Cancelled" },
+            },
+          });
+        }
+
+        const couponItems = validItems.map((item) => {
+          const unitPrice = item.variant
+            ? new Prisma.Decimal(item.variant.price)
+            : new Prisma.Decimal(item.product.price || 0);
+          return {
+            productId: item.productId,
+            categoryId: item.product.categoryId,
+            brandId: item.product.brandId,
+            quantity: item.quantity,
+            unitPrice,
+            subtotal: unitPrice.mul(item.quantity),
+          };
+        });
+
+        const calcResult = calculateCouponDiscount({
+          coupon,
+          items: couponItems,
+          customerId: identifier.customerId,
+          customerOrderCountWithCoupon,
+        });
+
+        if (calcResult.isValid) {
+          discount = Number(calcResult.discountAmount);
+          appliedCoupon = {
+            id: coupon.id,
+            code: coupon.code,
+            discountType: coupon.discountType,
+            discountValue: calcResult.discountValue,
+            isFreeShipping: calcResult.isFreeShipping,
+          };
+        } else {
+          await dbClient.cart.update({
+            where: { id: cart.id },
+            data: { couponId: null },
+          });
+        }
+      }
+    }
+
     return {
       id: cart.id,
       customerId: cart.customerId || null,
       sessionId: cart.sessionId || null,
+      couponId: appliedCoupon ? appliedCoupon.id : null,
+      coupon: appliedCoupon,
       itemCount,
       subtotal,
-      discount: 0,
+      discount,
       shippingFee: 0,
       estimatedTax: 0,
-      total: subtotal,
+      total: Math.max(0, subtotal - discount),
       items: itemsWithPricing,
       createdAt: cart.createdAt,
       updatedAt: cart.updatedAt,
@@ -232,10 +299,13 @@ export class StorefrontCartService {
       let availableStock = 0;
 
       if (variant) {
-        const totalStock = (variant.inventories || []).reduce(
+        let totalStock = (variant.inventories || []).reduce(
           (sum: number, inv: any) => sum + (inv.quantityAvailable - inv.quantityReserved),
           0
         );
+        if (totalStock === 0 && (!variant.inventories || variant.inventories.length === 0) && product.inventory) {
+          totalStock = product.inventory.quantityAvailable - product.inventory.quantityReserved;
+        }
         availableStock = Math.max(0, totalStock);
       } else if (product.inventory) {
         availableStock = Math.max(
@@ -313,7 +383,7 @@ export class StorefrontCartService {
         });
       }
 
-      return this.getCart(identifier);
+      return this.getCart(identifier, tx);
     });
   }
 
@@ -421,20 +491,20 @@ export class StorefrontCartService {
     return this.getCart(identifier);
   }
 
-  static async mergeGuestCart(guestSessionId: string, customerId: string) {
-    const guestCart = await prisma.cart.findFirst({
+  static async mergeGuestCart(guestSessionId: string, customerId: string, dbClient: any = prisma) {
+    const guestCart = await dbClient.cart.findFirst({
       where: { sessionId: guestSessionId },
       include: { items: true },
     });
 
     if (!guestCart || guestCart.items.length === 0) {
       if (guestCart) {
-        await prisma.cart.delete({ where: { id: guestCart.id } });
+        await dbClient.cart.delete({ where: { id: guestCart.id } });
       }
       return;
     }
 
-    await prisma.$transaction(async (tx) => {
+    const performMerge = async (tx: any) => {
       let customerCart = await tx.cart.findFirst({
         where: { customerId },
         include: { items: true },
@@ -473,6 +543,12 @@ export class StorefrontCartService {
       await tx.cart.delete({
         where: { id: guestCart.id },
       });
-    });
+    };
+
+    if (dbClient.$transaction) {
+      await dbClient.$transaction(performMerge);
+    } else {
+      await performMerge(dbClient);
+    }
   }
 }

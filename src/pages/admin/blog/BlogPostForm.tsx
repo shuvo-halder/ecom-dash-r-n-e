@@ -6,6 +6,8 @@ import { useQuery } from '@tanstack/react-query';
 import { mediaService } from '../../../services/media.service';
 import { useAuth } from '../../../context/AuthContext';
 import { Globe, FileText, ArrowLeft, Eye, Image as ImageIcon, Loader2, Calendar, Folder } from 'lucide-react';
+import { RichTextEditor } from '../../../components/ui/RichTextEditor';
+import DOMPurify from 'dompurify';
 
 interface BlogPostFormProps {
   initialData?: any;
@@ -154,15 +156,13 @@ export function BlogPostForm({ initialData, onSubmit, isLoading }: BlogPostFormP
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground">Excerpt (Short Summary)</label>
-                  <textarea
-                    id="blog-excerpt-input"
-                    name="excerpt"
+                  <RichTextEditor
+                    label="Excerpt (Short Summary)"
                     value={formData.excerpt}
-                    onChange={handleChange}
-                    rows={3}
+                    onChange={(val) => setFormData((prev) => ({ ...prev, excerpt: val }))}
                     placeholder="Provide a captivating 1-2 sentence summary for lists and SEO cards..."
-                    className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    minHeight="120px"
+                    folder="blog"
                   />
                 </div>
 
@@ -185,23 +185,23 @@ export function BlogPostForm({ initialData, onSubmit, isLoading }: BlogPostFormP
                   </div>
 
                   {previewMode ? (
-                    <div className="min-h-[350px] p-4 rounded-md border border-input bg-muted/30 overflow-y-auto prose dark:prose-invert max-w-none">
+                    <div className="min-h-[350px] p-4 rounded-md border border-input bg-muted/30 overflow-y-auto prose dark:prose-invert max-w-none text-foreground">
                       {formData.content ? (
-                        <div className="whitespace-pre-wrap">{formData.content}</div>
+                        <div
+                          className="prose dark:prose-invert max-w-none"
+                          dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(formData.content) }}
+                        />
                       ) : (
                         <span className="text-muted-foreground italic">No content written yet.</span>
                       )}
                     </div>
                   ) : (
-                    <textarea
-                      id="blog-content-input"
-                      name="content"
+                    <RichTextEditor
                       value={formData.content}
-                      onChange={handleChange}
-                      rows={15}
-                      placeholder="Write your article content here in rich HTML or plain markdown..."
-                      className="flex min-h-[350px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                      required
+                      onChange={(val) => setFormData((prev) => ({ ...prev, content: val }))}
+                      placeholder="Write your article content here in rich text with headings, lists, images, code blocks..."
+                      minHeight="350px"
+                      folder="blog"
                     />
                   )}
                 </div>

@@ -6,7 +6,7 @@ import { verifyCustomerToken } from "../utils/customerJwt";
 export interface CustomerAuthRequest extends Request {
   customer?: {
     id: string;
-    email: string;
+    email: string | null;
     firstName: string;
   };
 }
@@ -98,28 +98,31 @@ export const requireCustomerAuth = async (
 
     next();
   } catch (error: any) {
+    const isExpired = error.message === "jwt expired" || error.name === "TokenExpiredError";
     const ip = (req.headers["x-forwarded-for"] as string) || req.ip || req.socket.remoteAddress || "Unknown";
-    console.warn(`[SECURITY] Invalid customer JWT Token attempt from IP: ${ip}, error: ${error.message}`);
     
-    try {
-      await prisma.activityLog.create({
-        data: {
-          userId: null,
-          action: "INVALID_CUSTOMER_TOKEN",
-          entityType: "Security",
-          entityId: null,
-          ipAddress: ip,
-          details: JSON.stringify({
-            reason: error.message || "JWT verification failed",
-            tokenFragment: req.headers.authorization ? req.headers.authorization.substring(0, 15) + "..." : null,
-            timestamp: new Date().toISOString()
-          })
-        }
-      });
-    } catch (logErr) {
-      console.error("Failed to log invalid customer token to activity log:", logErr);
+    if (!isExpired) {
+      console.warn(`[SECURITY] Invalid customer JWT Token attempt from IP: ${ip}, error: ${error.message}`);
+      try {
+        await prisma.activityLog.create({
+          data: {
+            userId: null,
+            action: "INVALID_CUSTOMER_TOKEN",
+            entityType: "Security",
+            entityId: null,
+            ipAddress: ip,
+            details: JSON.stringify({
+              reason: error.message || "JWT verification failed",
+              tokenFragment: req.headers.authorization ? req.headers.authorization.substring(0, 15) + "..." : null,
+              timestamp: new Date().toISOString()
+            })
+          }
+        });
+      } catch (logErr) {
+        console.error("Failed to log invalid customer token to activity log:", logErr);
+      }
     }
 
-    return next(new AppError("Invalid or expired token", 401, "UNAUTHORIZED"));
+    return next(new AppError(isExpired ? "Token expired" : "Invalid token", 401, "UNAUTHORIZED"));
   }
 };

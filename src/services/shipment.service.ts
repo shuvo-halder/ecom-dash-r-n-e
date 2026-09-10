@@ -19,3 +19,8 @@ export const createShipment = async (payload: any) => {
   const { data } = await api.post("/shipments", payload);
   return data.data.shipment;
 };
+
+export const deleteShipment = async (id: string) => {
+  const { data } = await api.delete(`/shipments/${id}`);
+  return data;
+};

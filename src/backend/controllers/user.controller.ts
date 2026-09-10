@@ -4,6 +4,7 @@ import { prisma } from "../config/db";
 import { AppError } from "../utils/AppError";
 import { AuthRequest } from "../middlewares/auth";
 import { AuditService } from "../services/audit.service";
+import { PermissionService } from "../services/permission.service";
 
 // GET /api/v1/users
 export const getAllUsers = async (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -111,12 +112,23 @@ export const createUser = async (req: AuthRequest, res: Response, next: NextFunc
       return next(new AppError("A user with this email already exists", 400, "EMAIL_IN_USE"));
     }
 
-    const role = await prisma.role.findUnique({
+    const targetRole = await prisma.role.findUnique({
       where: { id: roleId },
     });
 
-    if (!role || role.deletedAt) {
+    if (!targetRole || targetRole.deletedAt) {
       return next(new AppError("Role not found", 404, "ROLE_NOT_FOUND"));
+    }
+
+    // Privilege escalation check: Non-SuperAdmin cannot create a user with the SuperAdmin role
+    if (targetRole.name === "SuperAdmin" && !PermissionService.isSuperAdmin(req.user)) {
+      await AuditService.logPrivilegeEscalationAttempt(
+        req.user?.id || null,
+        "CREATE_SUPERADMIN_USER",
+        { targetEmail: email, targetRoleId: roleId },
+        req
+      );
+      return next(new AppError("Only SuperAdmin can create SuperAdmin accounts", 403, "SUPERADMIN_PROTECTED"));
     }
 
     const passwordHash = await bcrypt.hash(password, 12);
@@ -146,7 +158,7 @@ export const createUser = async (req: AuthRequest, res: Response, next: NextFunc
       req.user?.id || null,
       user.id,
       user.email,
-      role.name,
+      targetRole.name,
       req
     );
 
@@ -167,10 +179,22 @@ export const updateUser = async (req: AuthRequest, res: Response, next: NextFunc
 
     const user = await prisma.user.findFirst({
       where: { id, deletedAt: null },
+      include: { role: true },
     });
 
     if (!user) {
       return next(new AppError("User not found", 404, "NOT_FOUND"));
+    }
+
+    // Privilege escalation check: Non-SuperAdmin cannot modify SuperAdmin profile
+    if (user.role?.name === "SuperAdmin" && !PermissionService.isSuperAdmin(req.user)) {
+      await AuditService.logPrivilegeEscalationAttempt(
+        req.user?.id || null,
+        "MODIFY_SUPERADMIN_PROFILE",
+        { targetUserId: id, targetEmail: user.email },
+        req
+      );
+      return next(new AppError("Only SuperAdmin can modify SuperAdmin accounts", 403, "SUPERADMIN_PROTECTED"));
     }
 
     if (email && email.toLowerCase() !== user.email.toLowerCase()) {
@@ -223,6 +247,11 @@ export const deleteUser = async (req: AuthRequest, res: Response, next: NextFunc
   try {
     const { id } = req.params;
 
+    // Self-deletion check
+    if (req.user?.id === id) {
+      return next(new AppError("You cannot delete your own account", 403, "CANNOT_DELETE_SELF"));
+    }
+
     const user = await prisma.user.findFirst({
       where: { id, deletedAt: null },
       include: { role: true },
@@ -232,7 +261,13 @@ export const deleteUser = async (req: AuthRequest, res: Response, next: NextFunc
       return next(new AppError("User not found", 404, "NOT_FOUND"));
     }
 
-    if (user.role.name === "SuperAdmin") {
+    if (user.role?.name === "SuperAdmin") {
+      await AuditService.logPrivilegeEscalationAttempt(
+        req.user?.id || null,
+        "DELETE_SUPERADMIN_USER",
+        { targetUserId: id, targetEmail: user.email },
+        req
+      );
       return next(new AppError("SuperAdmin user cannot be deleted", 403, "SUPERADMIN_PROTECTED"));
     }
 
@@ -282,6 +317,11 @@ export const updateUserStatus = async (req: AuthRequest, res: Response, next: Ne
       return next(new AppError("Status or isActive field is required", 400, "MISSING_FIELDS"));
     }
 
+    // Self-modification safeguard
+    if (req.user?.id === id && !targetActive) {
+      return next(new AppError("You cannot deactivate your own account", 403, "CANNOT_DISABLE_SELF"));
+    }
+
     const user = await prisma.user.findFirst({
       where: { id, deletedAt: null },
       include: { role: true },
@@ -291,7 +331,13 @@ export const updateUserStatus = async (req: AuthRequest, res: Response, next: Ne
       return next(new AppError("User not found", 404, "NOT_FOUND"));
     }
 
-    if (user.role.name === "SuperAdmin" && !targetActive) {
+    if (user.role?.name === "SuperAdmin" && !targetActive) {
+      await AuditService.logPrivilegeEscalationAttempt(
+        req.user?.id || null,
+        "DISABLE_SUPERADMIN_USER",
+        { targetUserId: id, targetEmail: user.email },
+        req
+      );
       return next(new AppError("SuperAdmin account cannot be disabled", 403, "SUPERADMIN_PROTECTED"));
     }
 
@@ -335,6 +381,11 @@ export const updateUserRole = async (req: AuthRequest, res: Response, next: Next
       return next(new AppError("roleId is required", 400, "MISSING_FIELDS"));
     }
 
+    // Self-modification safeguard
+    if (req.user?.id === id) {
+      return next(new AppError("You cannot modify your own role", 403, "CANNOT_MODIFY_OWN_ROLE"));
+    }
+
     const user = await prisma.user.findFirst({
       where: { id, deletedAt: null },
       include: { role: true },
@@ -344,7 +395,14 @@ export const updateUserRole = async (req: AuthRequest, res: Response, next: Next
       return next(new AppError("User not found", 404, "NOT_FOUND"));
     }
 
-    if (user.role.name === "SuperAdmin" && user.role.id !== roleId) {
+    // Protection for existing SuperAdmin user
+    if (user.role?.name === "SuperAdmin" && !PermissionService.isSuperAdmin(req.user)) {
+      await AuditService.logPrivilegeEscalationAttempt(
+        req.user?.id || null,
+        "DEMOTE_SUPERADMIN_ROLE",
+        { targetUserId: id, targetEmail: user.email },
+        req
+      );
       return next(new AppError("SuperAdmin user cannot lose SuperAdmin role", 403, "SUPERADMIN_PROTECTED"));
     }
 
@@ -354,6 +412,17 @@ export const updateUserRole = async (req: AuthRequest, res: Response, next: Next
 
     if (!newRole || newRole.deletedAt) {
       return next(new AppError("Target role not found", 404, "ROLE_NOT_FOUND"));
+    }
+
+    // Privilege escalation: Non-SuperAdmin cannot assign SuperAdmin role
+    if (newRole.name === "SuperAdmin" && !PermissionService.isSuperAdmin(req.user)) {
+      await AuditService.logPrivilegeEscalationAttempt(
+        req.user?.id || null,
+        "PROMOTE_TO_SUPERADMIN_ROLE",
+        { targetUserId: id, targetEmail: user.email, targetRoleId: roleId },
+        req
+      );
+      return next(new AppError("Only SuperAdmin can assign the SuperAdmin role", 403, "SUPERADMIN_PROTECTED"));
     }
 
     await prisma.$transaction([
@@ -433,10 +502,22 @@ export const adminResetPassword = async (req: AuthRequest, res: Response, next: 
 
     const user = await prisma.user.findFirst({
       where: { id, deletedAt: null },
+      include: { role: true },
     });
 
     if (!user) {
       return next(new AppError("User not found", 404, "NOT_FOUND"));
+    }
+
+    // Privilege escalation check: Non-SuperAdmin CANNOT reset password of SuperAdmin
+    if (user.role?.name === "SuperAdmin" && !PermissionService.isSuperAdmin(req.user)) {
+      await AuditService.logPrivilegeEscalationAttempt(
+        req.user?.id || null,
+        "RESET_SUPERADMIN_PASSWORD",
+        { targetUserId: id, targetEmail: user.email },
+        req
+      );
+      return next(new AppError("Only SuperAdmin can reset the password of a SuperAdmin account", 403, "SUPERADMIN_PROTECTED"));
     }
 
     const passwordHash = await bcrypt.hash(newPassword, 12);

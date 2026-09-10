@@ -119,3 +119,33 @@ export const resetPasswordLimiter = createLimiter({
   actionName: "RESET_PASSWORD_ATTEMPT",
   skipSuccessfulRequests: true
 });
+
+// Dedicated Register rate limiter (5 requests/60 minutes per IP)
+export const registerLimiter = createLimiter({
+  max: 5,
+  minutes: 60,
+  actionName: "REGISTER_ATTEMPT",
+});
+
+// Dedicated Verify Email rate limiter (10 requests/15 minutes per IP)
+export const verifyEmailLimiter = createLimiter({
+  max: 10,
+  minutes: 15,
+  actionName: "VERIFY_EMAIL_ATTEMPT",
+  skipSuccessfulRequests: true
+});
+
+// Dedicated Resend Verification rate limiter (3 requests/60 minutes per IP)
+export const resendVerificationLimiter = createLimiter({
+  max: 3,
+  minutes: 60,
+  actionName: "RESEND_VERIFICATION_ATTEMPT",
+});
+
+// Dedicated OTP Request limiter (5 requests/minute per IP, NO skipping successes to prevent timing enumeration attacks)
+export const otpRequestLimiter = createLimiter({
+  max: 5,
+  minutes: 1,
+  actionName: "OTP_REQUEST_ATTEMPT",
+  skipSuccessfulRequests: false
+});

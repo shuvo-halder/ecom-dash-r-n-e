@@ -1,14 +1,20 @@
 const fs = require('fs');
-let content = fs.readFileSync('src/backend/routes/customer-auth.routes.ts', 'utf8');
+const file = 'src/backend/routes/storefront/review.routes.ts';
+let content = fs.readFileSync(file, 'utf8');
 
 content = content.replace(
-  'import { register, login, logout } from "../controllers/customer-auth.controller";',
-  'import { register, login, logout, googleAuth } from "../controllers/customer-auth.controller";'
+  /import \{ getProductReviews, checkEligibility, submitReview \} from "\.\.\/\.\.\/controllers\/storefront\/review\.controller";/,
+  'import { getProductReviews, checkEligibility, submitReview, getFeaturedReviews } from "../../controllers/storefront/review.controller";'
 );
 
 content = content.replace(
-  'router.post("/logout", requireCustomerAuth, logout);',
-  'router.post("/logout", requireCustomerAuth, logout);\nrouter.post("/google", googleAuth);'
+  /import \{ createReviewSchema \} from "\.\.\/\.\.\/validators\/review\.validator";/,
+  'import { createReviewSchema, getFeaturedReviewsQuerySchema } from "../../validators/review.validator";\nimport { validateQuery } from "../../middlewares/validation";'
 );
 
-fs.writeFileSync('src/backend/routes/customer-auth.routes.ts', content);
+content = content.replace(
+  /router\.get\("\/:productId", getProductReviews\);/,
+  'router.get("/featured", validateQuery(getFeaturedReviewsQuerySchema), getFeaturedReviews);\n\nrouter.get("/:productId", getProductReviews);'
+);
+
+fs.writeFileSync(file, content);

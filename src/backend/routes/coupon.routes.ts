@@ -10,6 +10,8 @@ import {
   validateCoupon,
 } from "../controllers/coupon.controller";
 import { requireAuth, requirePermission } from "../middlewares/auth";
+import { validateBody } from "../middlewares/validation";
+import { createCouponSchema, updateCouponSchema } from "../validators/coupon.validator";
 
 const router = express.Router();
 
@@ -21,11 +23,11 @@ router.use(requireAuth);
 
 router.route("/")
   .get(requirePermission("Coupons", "read"), getAllCoupons)
-  .post(requirePermission("Coupons", "write"), createCoupon);
+  .post(requirePermission("Coupons", "write"), validateBody(createCouponSchema), createCoupon);
 
 router.route("/:id")
   .get(requirePermission("Coupons", "read"), getCouponById)
-  .put(requirePermission("Coupons", "write"), updateCoupon)
+  .put(requirePermission("Coupons", "write"), validateBody(updateCouponSchema), updateCoupon)
   .delete(requirePermission("Coupons", "delete"), deleteCoupon);
 
 router.patch("/:id/toggle", requirePermission("Coupons", "write"), toggleCouponActive);

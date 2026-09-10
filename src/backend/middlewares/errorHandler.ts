@@ -59,6 +59,19 @@ export const errorHandler = (
     statusCode = 401;
     code = "INVALID_TOKEN";
     message = "Invalid or expired authentication token.";
+  } else if (err.code === "LIMIT_FILE_SIZE") {
+    statusCode = 400;
+    code = "FILE_TOO_LARGE";
+    message = "File size exceeds 10MB limit";
+  } else if (err.code === "LIMIT_UNEXPECTED_FILE") {
+    statusCode = 400;
+    code = "UNEXPECTED_FILE_FIELD";
+    message = "Unexpected file upload field name";
+  }
+
+  // Sanitize internal server errors in production
+  if (isProd && statusCode === 500) {
+    message = "An unexpected server error occurred. Please contact the administrator if this persists.";
   }
 
   // Clean up paths in production
@@ -106,6 +119,7 @@ export const errorHandler = (
     error: {
       code,
       message,
+      ...(err.details !== undefined ? { details: err.details } : {}),
     },
   });
 };

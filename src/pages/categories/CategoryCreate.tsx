@@ -5,6 +5,7 @@ import { CategoryForm } from './CategoryForm';
 import { createCategory } from '../../services/category.service';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/src/components/ui/button';
+import { notify } from '@/src/lib/notify';
 
 export function CategoryCreate() {
   const navigate = useNavigate();
@@ -12,13 +13,13 @@ export function CategoryCreate() {
 
   const mutation = useMutation({
     mutationFn: createCategory,
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['categories'] });
+      notify.success('Category Created', `"${data?.name || 'Category'}" was created successfully.`);
       navigate('/categories');
     },
     onError: (error: any) => {
-      console.error('Failed to create category', error);
-      alert(error.response?.data?.error?.message || 'Failed to create category');
+      notify.apiError(error, 'Failed to create category. Ensure the slug is unique.');
     }
   });
 
@@ -35,3 +36,4 @@ export function CategoryCreate() {
     </div>
   );
 }
+

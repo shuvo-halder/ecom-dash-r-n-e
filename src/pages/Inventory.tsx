@@ -41,7 +41,7 @@ export function Inventory() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              ${(inventoryValue.totalValue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              ৳{(inventoryValue.totalValue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               Estimated inventory value
@@ -205,7 +205,7 @@ export function Inventory() {
                     </TableCell>
                     <TableCell>{item.quantityReserved}</TableCell>
                     <TableCell>{item.quantity}</TableCell>
-                    <TableCell>${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                    <TableCell>৳{value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
                   </TableRow>
                 );
               })}

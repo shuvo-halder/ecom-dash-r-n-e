@@ -95,7 +95,7 @@ test("Storefront Merchant Feed Integration Tests", async (t) => {
     const p1 = items.find((i: any) => i.id.includes(TEST_PREFIX) || i.sku === "SKU-001");
     assert.ok(p1);
     assert.strictEqual(p1.availability, "in stock");
-    assert.strictEqual(p1.price, "99.99 USD");
+    assert.strictEqual(p1.price, "99.99 BDT");
     assert.strictEqual(p1.gtin, "1234567890123");
     assert.strictEqual(p1.mpn, "MPN-001");
     assert.strictEqual(p1.brand, "Merchant Brand");
@@ -104,7 +104,7 @@ test("Storefront Merchant Feed Integration Tests", async (t) => {
     const p2 = items.find((i: any) => i.title === "Merchant Prod 2");
     assert.ok(p2);
     assert.strictEqual(p2.availability, "out of stock");
-    assert.strictEqual(p2.price, "15.00 USD");
+    assert.strictEqual(p2.price, "15.00 BDT");
     assert.strictEqual(p2.gtin, undefined);
     assert.strictEqual(p2.mpn, undefined);
 

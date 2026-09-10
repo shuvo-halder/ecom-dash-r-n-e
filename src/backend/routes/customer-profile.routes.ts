@@ -10,6 +10,7 @@ import {
   getPreferences,
   updatePreferences
 } from "../controllers/customer-profile.controller";
+import { getDashboard } from "../controllers/storefront/account.controller";
 import { validateBody, validateParamsUUID } from "../middlewares/validation";
 import { 
   updateProfileSchema, 
@@ -23,6 +24,9 @@ const router = express.Router();
 
 // Require auth for all profile routes
 router.use(requireCustomerAuth);
+
+// Dashboard
+router.get("/dashboard", getDashboard);
 
 // Profile
 router.get("/profile", getProfile);

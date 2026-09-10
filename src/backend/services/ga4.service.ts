@@ -5,9 +5,9 @@ export class GA4MappingService {
    * Maps a database Product to a GA4 Item
    * @param product The database product object (with relations)
    * @param quantity Optional quantity for the event (e.g. add_to_cart)
-   * @param currency Currency code (default: USD)
+   * @param currency Currency code (default: BDT)
    */
-  static mapProductToGA4Item(product: any, quantity: number = 1, currency: string = "USD"): GA4Item {
+  static mapProductToGA4Item(product: any, quantity: number = 1, currency: string = "BDT"): GA4Item {
     return {
       item_id: product.sku || product.id,
       item_name: product.name,
@@ -24,9 +24,9 @@ export class GA4MappingService {
    * Maps a database Product Variant to a GA4 Item
    * @param variant The database variant object (with product and relations)
    * @param quantity Optional quantity for the event
-   * @param currency Currency code (default: USD)
+   * @param currency Currency code (default: BDT)
    */
-  static mapVariantToGA4Item(variant: any, quantity: number = 1, currency: string = "USD"): GA4Item {
+  static mapVariantToGA4Item(variant: any, quantity: number = 1, currency: string = "BDT"): GA4Item {
     const product = variant.product || {};
     
     // Construct variant string from attributes if available
@@ -54,7 +54,7 @@ export class GA4MappingService {
   /**
    * Generates a view_item event payload for a product
    */
-  static generateViewItemEvent(product: any, currency: string = "USD") {
+  static generateViewItemEvent(product: any, currency: string = "BDT") {
     const item = this.mapProductToGA4Item(product, 1, currency);
     return {
       currency,

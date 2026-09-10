@@ -21,6 +21,7 @@ import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
 import { Input } from "../components/ui/input";
 import { Badge } from "../components/ui/badge";
+import { notify } from "../lib/notify";
 
 const COMMON_ACTIONS = [
   "LOGIN_SUCCESS",
@@ -166,9 +167,10 @@ export function AuditLogs() {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      notify.success("Audit Logs Exported", `Successfully generated enterprise log export (.${format}).`);
     } catch (err) {
       console.error("Export failed:", err);
-      alert("Failed to export logs via API. Downloading logs visible in current view.");
+      notify.warning("Direct Export Failed", "Server export unavailable. Downloading logs visible in current view as fallback.");
       
       // Fallback: Export visible logs client-side
       const dataStr = format === "json" 

@@ -5,6 +5,7 @@ import { BlogPostForm } from './BlogPostForm';
 import { blogService } from '../../../services/blog.service';
 import { ArrowLeft, PenTool } from 'lucide-react';
 import { Button } from '../../../components/ui/button';
+import { notify } from '../../../lib/notify';
 
 export function BlogPostCreate() {
   const navigate = useNavigate();
@@ -12,13 +13,13 @@ export function BlogPostCreate() {
 
   const mutation = useMutation({
     mutationFn: blogService.createPost,
-    onSuccess: () => {
+    onSuccess: (res: any) => {
       queryClient.invalidateQueries({ queryKey: ['blog-posts'] });
+      notify.success('Blog Post Created', `Post "${res?.title || 'Blog Post'}" has been published.`);
       navigate('/admin/blog');
     },
     onError: (error: any) => {
-      console.error('Failed to create post', error);
-      alert(error.response?.data?.error?.message || 'Failed to create blog post. Ensure the slug is unique.');
+      notify.apiError(error, 'Failed to create blog post. Ensure the slug is unique.');
     }
   });
 

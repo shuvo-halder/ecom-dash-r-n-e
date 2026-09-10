@@ -1,3 +1,4 @@
+import { emailService } from "../../services/email.service";
 import { Response, NextFunction } from "express";
 import { prisma } from "../../config/db";
 import { AppError } from "../../utils/AppError";
@@ -23,24 +24,14 @@ export const getDashboard = async (req: CustomerAuthRequest, res: Response, next
 
 export const getMyProfile = async (req: CustomerAuthRequest, res: Response, next: NextFunction) => {
   try {
-    const customer = await prisma.customer.findUnique({
-      where: { id: req.customer!.id },
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        email: true,
-        phone: true,
-        emailVerified: true,
-        lastLoginAt: true,
-        createdAt: true,
-        updatedAt: true,
-      }
-    });
+    const customer = await StorefrontAccountService.getProfile(req.customer!.id);
 
     res.status(200).json({
       status: "success",
-      data: { customer },
+      data: {
+        profile: customer,
+        customer,
+      },
     });
   } catch (error) {
     next(error);
@@ -49,27 +40,20 @@ export const getMyProfile = async (req: CustomerAuthRequest, res: Response, next
 
 export const updateMyProfile = async (req: CustomerAuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { firstName, lastName, phone } = req.body;
+    const { firstName, lastName, avatarUrl } = req.body;
 
-    const customer = await prisma.customer.update({
-      where: { id: req.customer!.id },
-      data: { firstName, lastName, phone },
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        email: true,
-        phone: true,
-        emailVerified: true,
-        lastLoginAt: true,
-        createdAt: true,
-        updatedAt: true,
-      }
+    const customer = await StorefrontAccountService.updateProfile(req.customer!.id, {
+      firstName,
+      lastName,
+      avatarUrl,
     });
 
     res.status(200).json({
       status: "success",
-      data: { customer },
+      data: {
+        profile: customer,
+        customer,
+      },
     });
   } catch (error) {
     next(error);
@@ -78,7 +62,9 @@ export const updateMyProfile = async (req: CustomerAuthRequest, res: Response, n
 
 export const updateEmail = async (req: CustomerAuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { newEmail, currentPassword } = req.body;
+    const { currentPassword } = req.body;
+    let newEmail = req.body.newEmail;
+    if (newEmail) newEmail = newEmail.trim().toLowerCase();
     const customerId = req.customer!.id;
 
     const customer = await prisma.customer.findUnique({ where: { id: customerId } });
@@ -95,9 +81,16 @@ export const updateEmail = async (req: CustomerAuthRequest, res: Response, next:
       return next(new AppError("New email must be different", 400, "BAD_REQUEST"));
     }
 
-    const existingEmail = await prisma.customer.findUnique({ where: { email: newEmail } });
+    const existingEmail = await prisma.customer.findFirst({ 
+      where: { 
+        OR: [
+          { email: newEmail },
+          { pendingEmail: newEmail }
+        ]
+      } 
+    });
     if (existingEmail) {
-      return next(new AppError("Email already in use", 400, "BAD_REQUEST"));
+      return next(new AppError("Email already in use or pending verification", 400, "BAD_REQUEST"));
     }
 
     const verificationToken = crypto.randomBytes(32).toString("hex");
@@ -106,18 +99,30 @@ export const updateEmail = async (req: CustomerAuthRequest, res: Response, next:
     await prisma.customer.update({
       where: { id: customerId },
       data: {
-        email: newEmail,
-        emailVerified: false,
-        verificationToken,
-        verificationExpires,
+        pendingEmail: newEmail,
+        pendingEmailVerificationToken: verificationToken,
+        pendingEmailVerificationExpires: verificationExpires,
       },
     });
 
-    // TODO: Send verification email for the new email address
+    try {
+      await emailService.sendEmailChangeVerificationEmail(newEmail, customer.firstName, verificationToken);
+    } catch (err) {
+      // Revert pending email changes on SMTP failure
+      await prisma.customer.update({
+        where: { id: customerId },
+        data: {
+          pendingEmail: null,
+          pendingEmailVerificationToken: null,
+          pendingEmailVerificationExpires: null,
+        }
+      });
+      return next(new AppError("Failed to send verification email to the new address. Please try again.", 500, "EMAIL_SEND_FAILED"));
+    }
 
     res.status(200).json({
       status: "success",
-      message: "Email updated. Please verify your new email address.",
+      message: "A verification email has been sent to your new address. Your current email will remain active until verified.",
     });
   } catch (error) {
     next(error);
@@ -352,6 +357,97 @@ export const revokeAllOtherSessions = async (req: CustomerAuthRequest, res: Resp
     res.status(200).json({
       status: "success",
       message: "All other sessions revoked",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getNotificationPreferences = async (req: CustomerAuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const customerId = req.customer!.id;
+    let prefs = await prisma.notificationPreference.findUnique({
+      where: { customerId }
+    });
+    
+    if (!prefs) {
+      prefs = await prisma.notificationPreference.create({
+        data: { customerId }
+      });
+    }
+
+    res.status(200).json({
+      status: "success",
+      data: { preferences: prefs },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateNotificationPreferences = async (req: CustomerAuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const customerId = req.customer!.id;
+    const { email, sms, inApp } = req.body;
+    
+    const prefs = await prisma.notificationPreference.upsert({
+      where: { customerId },
+      update: { email, sms, inApp },
+      create: { customerId, email: email ?? true, sms: sms ?? false, inApp: inApp ?? true },
+    });
+
+    res.status(200).json({
+      status: "success",
+      data: { preferences: prefs },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const verifyEmailChange = async (req: CustomerAuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { token } = req.body;
+    const customerId = req.customer!.id;
+
+    if (!token) {
+      return next(new AppError("Token is required", 400, "BAD_REQUEST"));
+    }
+
+    const customer = await prisma.customer.findFirst({
+      where: {
+        id: customerId,
+        pendingEmailVerificationToken: token,
+        pendingEmailVerificationExpires: { gt: new Date() },
+      },
+    });
+
+    if (!customer || !customer.pendingEmail) {
+      return next(new AppError("Token is invalid or has expired", 400, "BAD_REQUEST"));
+    }
+
+    // Ensure the pending email wasn't taken by someone else in the meantime
+    const existing = await prisma.customer.findUnique({
+      where: { email: customer.pendingEmail }
+    });
+    if (existing) {
+      return next(new AppError("This email is already in use by another account", 400, "BAD_REQUEST"));
+    }
+
+    await prisma.customer.update({
+      where: { id: customer.id },
+      data: {
+        email: customer.pendingEmail,
+        emailVerified: true,
+        pendingEmail: null,
+        pendingEmailVerificationToken: null,
+        pendingEmailVerificationExpires: null,
+      },
+    });
+
+    res.status(200).json({
+      status: "success",
+      message: "Email changed and verified successfully.",
     });
   } catch (error) {
     next(error);
