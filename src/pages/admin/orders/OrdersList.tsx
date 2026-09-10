@@ -7,6 +7,7 @@ import {
   RefreshCw,
   FileText,
   Printer,
+  Download,
   ChevronLeft,
   ChevronRight,
   UserCheck,
@@ -57,6 +58,102 @@ export function OrdersList() {
   // Print Slip Modal State
   const [printOrder, setPrintOrder] = useState<any>(null);
   const [printType, setPrintType] = useState<"invoice" | "packing_slip" | null>(null);
+
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleExportPendingOrders = async () => {
+    setIsExporting(true);
+    try {
+      let allPendingOrders: any[] = [];
+      let currentPage = 1;
+      let totalPages = 1;
+
+      do {
+        const data = await getOrders({
+          page: currentPage,
+          limit: 100,
+          status: "Pending",
+        });
+        
+        allPendingOrders = [...allPendingOrders, ...(data.orders || [])];
+        totalPages = data.pagination?.totalPages || 1;
+        currentPage++;
+      } while (currentPage <= totalPages);
+
+      if (allPendingOrders.length === 0) {
+        notify.info("No pending orders available for export.");
+        return;
+      }
+
+      const headers = [
+        "Order ID",
+        "Order Date",
+        "Customer Name",
+        "Customer Phone",
+        "Customer Email",
+        "Shipping Address",
+        "Product Details",
+        "Total Amount",
+        "Delivery Fee",
+        "Payment Method",
+        "Payment Status",
+        "Order Status",
+      ];
+
+      const escapeCsv = (str: any) => {
+        if (!str) return '""';
+        const stringified = String(str);
+        if (stringified.includes('"') || stringified.includes(',') || stringified.includes('\n') || stringified.includes('\r')) {
+          return `"${stringified.replace(/"/g, '""')}"`;
+        }
+        return stringified;
+      };
+
+      const rows = allPendingOrders.map((order) => {
+        const customerName = order.customer ? `${order.customer.firstName || ""} ${order.customer.lastName || ""}`.trim() : "Guest";
+        const customerPhone = order.customer?.phone || "";
+        const customerEmail = order.customer?.email || order.customerEmail || "";
+        
+        const productsDetail = (order.items || [])
+          .map((item: any) => `${item.product?.name || item.productName || "Product"} x${item.quantity}`)
+          .join("; ");
+
+        return [
+          escapeCsv(order.orderNumber || order.id),
+          escapeCsv(new Date(order.createdAt).toLocaleDateString()),
+          escapeCsv(customerName),
+          escapeCsv(customerPhone),
+          escapeCsv(customerEmail),
+          escapeCsv(order.shippingAddress || ""),
+          escapeCsv(productsDetail),
+          escapeCsv(Number(order.totalAmount || 0).toFixed(2)),
+          escapeCsv(Number(order.shippingFee || 0).toFixed(2)),
+          escapeCsv(order.paymentMethod || ""),
+          escapeCsv(order.paymentStatus || "Unpaid"),
+          escapeCsv(order.status || "Pending"),
+        ].join(",");
+      });
+
+      const csvContent = [headers.join(","), ...rows].join("\n");
+      const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `pending-orders-${new Date().toISOString().split("T")[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      notify.success(`Exported ${allPendingOrders.length} pending orders.`);
+    } catch (err: any) {
+      console.error(err);
+      notify.error("Failed to export pending orders.");
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const fetchOrders = async () => {
     setLoading(true);
@@ -179,9 +276,15 @@ export function OrdersList() {
           <h1 className="text-2xl font-bold tracking-tight text-foreground">Order Management</h1>
           <p className="text-sm text-muted-foreground">View, search, filter, and manage store customer orders.</p>
         </div>
-        <Button onClick={fetchOrders} variant="outline" size="sm" className="gap-2">
-          <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} /> Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button onClick={handleExportPendingOrders} variant="outline" size="sm" className="gap-2" disabled={isExporting}>
+            <Download className={`w-4 h-4 ${isExporting ? "animate-bounce" : ""}`} /> 
+            {isExporting ? "Exporting..." : "Export Pending CSV"}
+          </Button>
+          <Button onClick={fetchOrders} variant="outline" size="sm" className="gap-2">
+            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} /> Refresh
+          </Button>
+        </div>
       </div>
 
       {/* Filters Bar */}
