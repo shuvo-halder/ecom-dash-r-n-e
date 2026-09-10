@@ -23,6 +23,7 @@ import {
   RotateCcw
 } from "lucide-react";
 import { getOrders, updateOrderStatus, deleteOrder } from "../../../services/order.service";
+import { getStoreSettings } from "../../../services/setting.service";
 import { Button } from "../../../components/ui/button";
 import { Input } from "../../../components/ui/input";
 import { useAuth } from "../../../context/AuthContext";
@@ -58,6 +59,12 @@ export function OrdersList() {
   // Print Slip Modal State
   const [printOrder, setPrintOrder] = useState<any>(null);
   const [printType, setPrintType] = useState<"invoice" | "packing_slip" | null>(null);
+
+  const [storeSettings, setStoreSettings] = useState<any>(null);
+
+  useEffect(() => {
+    getStoreSettings().then(setStoreSettings).catch(console.error);
+  }, []);
 
   const [isExporting, setIsExporting] = useState(false);
 
@@ -593,9 +600,12 @@ export function OrdersList() {
                     />
                   )}
                   <h2 className="text-xl font-extrabold tracking-tight">{branding.siteName || "E-Commerce Enterprise Inc."}</h2>
-                  <p className="text-xs text-muted-foreground print:text-gray-600">100 Enterprise Way, Suite 400</p>
-                  <p className="text-xs text-muted-foreground print:text-gray-600">San Francisco, CA 94107</p>
-                  <p className="text-xs text-muted-foreground print:text-gray-600">support@enterprise-ecommerce.com</p>
+                  {storeSettings?.address ? (
+                    <p className="text-xs text-muted-foreground print:text-gray-600 whitespace-pre-wrap">{storeSettings.address}</p>
+                  ) : null}
+                  {storeSettings?.supportEmail ? (
+                    <p className="text-xs text-muted-foreground print:text-gray-600">{storeSettings.supportEmail}</p>
+                  ) : null}
                 </div>
                 <div className="text-right">
                   <p className="text-sm font-bold text-primary print:text-black">{printOrder.orderNumber}</p>
