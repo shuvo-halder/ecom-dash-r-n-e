@@ -59,7 +59,7 @@ export function CreateShipmentModal({
     setErrorCode(null);
     setProvider("manual");
     setTrackingNumber("");
-    setDeliveryFee(order.shippingCost ? Number(order.shippingCost) : 60);
+    setDeliveryFee(order.shippingFee !== undefined && order.shippingFee !== null ? Number(order.shippingFee) : (order.shippingCost !== undefined && order.shippingCost !== null ? Number(order.shippingCost) : 0));
     setNotes("");
     setShipmentStatus("SHIPPED");
 
