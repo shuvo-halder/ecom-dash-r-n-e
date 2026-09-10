@@ -1,5 +1,5 @@
 import { Response, NextFunction } from "express";
-import { Prisma, PaymentStatus, RefundStatus } from "@prisma/client";
+import { Prisma, PaymentStatus, PaymentProvider, RefundStatus } from "@prisma/client";
 import { prisma } from "../config/db";
 import { AuthRequest } from "../middlewares/auth";
 import { AppError } from "../utils/AppError";
@@ -373,6 +373,107 @@ export const updateOrderStatus = async (req: AuthRequest, res: Response, next: N
         if (index !== -1) timelineEntries.splice(index, 1);
       }
 
+      // Synchronize Payment ledger when paymentStatus is updated
+      if (paymentStatus && paymentStatus !== currentOrder.paymentStatus) {
+        const isTargetPaid = paymentStatus.toLowerCase() === "paid";
+        const isTargetUnpaid = paymentStatus.toLowerCase() === "unpaid";
+
+        if (isTargetPaid) {
+          const payments = await tx.payment.findMany({ where: { orderId: id } });
+
+          if (payments.length > 0) {
+            for (const payment of payments) {
+              if (payment.status === PaymentStatus.PENDING || payment.status === PaymentStatus.PROCESSING) {
+                await tx.payment.update({
+                  where: { id: payment.id },
+                  data: {
+                    status: PaymentStatus.PAID,
+                    paidAt: new Date(),
+                  },
+                });
+
+                await tx.paymentTransaction.create({
+                  data: {
+                    paymentId: payment.id,
+                    status: PaymentStatus.PAID,
+                    responsePayload: {
+                      action: "MANUAL_COD_MARK_PAID",
+                      markedBy: actorName,
+                      note: "COD payment manually marked as PAID by admin",
+                      timestamp: new Date().toISOString(),
+                    },
+                  },
+                });
+              }
+            }
+          } else {
+            // If order has no Payment row, create one for COD tracking
+            let provider: PaymentProvider = PaymentProvider.COD;
+            const pm = (currentOrder.paymentMethod || "").toUpperCase();
+            if (Object.values(PaymentProvider).includes(pm as any)) {
+              provider = pm as PaymentProvider;
+            }
+
+            const newPayment = await tx.payment.create({
+              data: {
+                orderId: id,
+                customerId: currentOrder.customerId || null,
+                provider,
+                amount: currentOrder.totalAmount,
+                currency: "BDT",
+                status: PaymentStatus.PAID,
+                paidAt: new Date(),
+              },
+            });
+
+            await tx.paymentTransaction.create({
+              data: {
+                paymentId: newPayment.id,
+                status: PaymentStatus.PAID,
+                responsePayload: {
+                  action: "MANUAL_COD_MARK_PAID",
+                  markedBy: actorName,
+                  note: "COD payment record created and marked as PAID by admin",
+                  timestamp: new Date().toISOString(),
+                },
+              },
+            });
+          }
+        } else if (isTargetUnpaid) {
+          // Revert payments marked as PAID if no refunds exist
+          const payments = await tx.payment.findMany({
+            where: {
+              orderId: id,
+              status: PaymentStatus.PAID,
+              refundedAmount: { equals: 0 },
+            },
+          });
+
+          for (const payment of payments) {
+            await tx.payment.update({
+              where: { id: payment.id },
+              data: {
+                status: PaymentStatus.PENDING,
+                paidAt: null,
+              },
+            });
+
+            await tx.paymentTransaction.create({
+              data: {
+                paymentId: payment.id,
+                status: PaymentStatus.PENDING,
+                responsePayload: {
+                  action: "MANUAL_COD_MARK_UNPAID",
+                  markedBy: actorName,
+                  note: "Payment status reverted to UNPAID by admin",
+                  timestamp: new Date().toISOString(),
+                },
+              },
+            });
+          }
+        }
+      }
+
       return await tx.order.update({
         where: { id },
         data: {
@@ -384,10 +485,29 @@ export const updateOrderStatus = async (req: AuthRequest, res: Response, next: N
           }),
         },
         include: {
-          customer: true,
-          items: { include: { product: true } },
+          customer: {
+            select: { id: true, firstName: true, lastName: true, email: true },
+          },
+          items: {
+            include: {
+              product: true,
+              productVariant: true,
+            },
+          },
+          shipments: {
+            orderBy: { createdAt: "desc" },
+            include: {
+              courier: true,
+              trackingEvents: {
+                orderBy: { timestamp: "desc" },
+              },
+            },
+          },
           timeline: { orderBy: { createdAt: "asc" } },
           orderNotes: { orderBy: { createdAt: "desc" } },
+          coupon: true,
+          payments: { orderBy: { createdAt: "desc" } },
+          refunds: { orderBy: { createdAt: "desc" } },
         },
       });
     });

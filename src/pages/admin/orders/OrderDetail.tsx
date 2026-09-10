@@ -16,7 +16,8 @@ import {
   Truck,
   XCircle,
   RotateCcw,
-  FileText
+  FileText,
+  Banknote
 } from "lucide-react";
 import {
   getOrderById,
@@ -98,9 +99,31 @@ export function OrderDetail() {
         paymentStatus: newPaymentStatus,
       });
       setOrder(updated);
+      setNewStatus(updated.status);
+      setNewPaymentStatus(updated.paymentStatus || "Unpaid");
       notify.success("Order Updated", `Status changed to ${newStatus} (${newPaymentStatus}).`);
     } catch (err: any) {
       notify.apiError(err, "Failed to update order status.");
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
+
+  const handleMarkCodPaid = async () => {
+    if (!id || !order) return;
+    setUpdatingStatus(true);
+    try {
+      const updated = await updateOrderStatus(id, {
+        paymentStatus: "Paid",
+      });
+      setOrder(updated);
+      setNewPaymentStatus(updated.paymentStatus || "Paid");
+      notify.success(
+        "COD Payment Marked as Paid",
+        "Cash on Delivery payment has been marked as Paid and synchronized with financial ledger."
+      );
+    } catch (err: any) {
+      notify.apiError(err, "Failed to mark COD payment as Paid.");
     } finally {
       setUpdatingStatus(false);
     }
@@ -177,6 +200,22 @@ export function OrderDetail() {
       </div>
     );
   }
+
+  const totalAmount = Number(order.totalAmount || 0);
+  const isPaid = order.paymentStatus?.toLowerCase() === "paid";
+  const paidAmount = isPaid
+    ? totalAmount
+    : Array.isArray(order.payments)
+    ? order.payments
+        .filter((p: any) => p.status === "PAID" || p.status === "COMPLETED")
+        .reduce((sum: number, p: any) => sum + (Number(p.amount || 0) - Number(p.refundedAmount || 0)), 0)
+    : 0;
+
+  const dueAmount = isPaid ? 0 : Math.max(0, totalAmount - paidAmount);
+  const isCodOrder = Boolean(
+    order.paymentMethod?.toLowerCase().includes("cod") ||
+    order.paymentMethod?.toLowerCase().includes("cash")
+  );
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
@@ -390,6 +429,35 @@ export function OrderDetail() {
           {/* Quick Actions / Status Update */}
           <div className="bg-card border rounded-lg p-5 space-y-4 shadow-xs">
             <h3 className="font-bold text-base">Update Order Status</h3>
+
+            {/* Quick COD Payment Confirmation Action */}
+            {isCodOrder && !isPaid && hasPermission("Orders", "write") && (
+              <div className="bg-amber-500/10 border border-amber-500/20 rounded-md p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-700 dark:text-amber-400">
+                    <Banknote className="w-4 h-4 shrink-0" />
+                    <span>Cash on Delivery (COD)</span>
+                  </div>
+                  <span className="text-xs font-mono font-bold text-foreground">
+                    Due: ৳{dueAmount.toFixed(2)}
+                  </span>
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  Customer paid the COD amount to the delivery person. Click below to record this payment as Paid.
+                </p>
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={updatingStatus}
+                  onClick={handleMarkCodPaid}
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs shadow-xs"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
+                  {updatingStatus ? "Recording..." : "Mark COD Payment as Paid"}
+                </Button>
+              </div>
+            )}
+
             <form onSubmit={handleUpdateStatus} className="space-y-3">
               <div>
                 <label className="block text-xs font-semibold uppercase text-muted-foreground mb-1">

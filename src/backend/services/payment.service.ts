@@ -1,6 +1,7 @@
 import { prisma } from "../config/db";
 import { AppError } from "../utils/AppError";
 import { PaymentStatus } from "@prisma/client";
+import { MeasurementProtocolService } from "./measurement-protocol.service";
 
 export class AdminPaymentService {
   static async getPayments(options: { page?: number; limit?: number; search?: string; status?: string } = {}) {
@@ -69,7 +70,7 @@ export class AdminPaymentService {
   }
 
   static async updatePaymentStatus(id: string, newStatus: PaymentStatus) {
-    return await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       // 1. Lock authoritative Payment row
       await tx.payment.update({
         where: { id },
@@ -123,6 +124,19 @@ export class AdminPaymentService {
         },
       });
 
+      // Record transaction
+      await tx.paymentTransaction.create({
+        data: {
+          paymentId: id,
+          status: newStatus,
+          responsePayload: {
+            action: "ADMIN_UPDATE_PAYMENT_STATUS",
+            newStatus,
+            timestamp: new Date().toISOString(),
+          },
+        },
+      });
+
       // Keep Order.paymentStatus and Order.status consistent
       if (payment.orderId) {
         const currentOrder = await tx.order.update({
@@ -139,11 +153,13 @@ export class AdminPaymentService {
           orderPaymentStatus = "Failed";
         } else if (newStatus === PaymentStatus.CANCELLED) {
           orderPaymentStatus = "Cancelled";
+        } else if (newStatus === PaymentStatus.PENDING) {
+          orderPaymentStatus = "Unpaid";
         }
 
-        const isTerminalOrderState = currentOrder.status === "Cancelled" || currentOrder.status === "Returned";
-        const nextOrderStatus = (newStatus === PaymentStatus.PAID && !isTerminalOrderState)
-          ? "PROCESSING"
+        // Only advance to Processing if order is currently in Pending state
+        const nextOrderStatus = (newStatus === PaymentStatus.PAID && currentOrder.status === "Pending")
+          ? "Processing"
           : currentOrder.status;
 
         await tx.order.update({
@@ -165,7 +181,15 @@ export class AdminPaymentService {
 
       return updatedPayment;
     });
+
+    if (result.orderId && newStatus === PaymentStatus.PAID) {
+      MeasurementProtocolService.processOrderPaymentSuccess(result.orderId).catch((err) => {
+        console.error("[Analytics] Error tracking payment success on admin payment update:", err);
+      });
     }
+
+    return result;
+  }
 
   static async deletePayment(id: string) {
     const payment = await prisma.payment.findFirst({
