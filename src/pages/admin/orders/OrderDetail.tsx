@@ -30,6 +30,7 @@ import { Input } from "../../../components/ui/input";
 import { useAuth } from "../../../context/AuthContext";
 import { notify } from "../../../lib/notify";
 import { PathaoShipmentCard } from "../../../components/admin/orders/PathaoShipmentCard";
+import { DeliveryBillingSection } from "../../../components/admin/orders/DeliveryBillingSection";
 
 export function OrderDetail() {
   const { id } = useParams<{ id: string }>();
@@ -312,6 +313,9 @@ export function OrderDetail() {
             })()}
           </div>
 
+          {/* Delivery & Billing Section */}
+          <DeliveryBillingSection order={order} />
+
           {/* Timeline Section */}
           <div className="bg-card border rounded-lg p-5 space-y-4 shadow-xs">
             <h3 className="font-bold text-base flex items-center gap-2">
@@ -488,24 +492,24 @@ export function OrderDetail() {
           {/* Shipping & Billing Address */}
           <div className="bg-card border rounded-lg p-5 space-y-4 shadow-xs">
             <h3 className="font-bold text-base flex items-center gap-2 border-b pb-2">
-              <MapPin className="w-4 h-4 text-primary" /> Delivery & Billing
+              <MapPin className="w-4 h-4 text-primary" /> Addresses & Payment
             </h3>
             <div className="space-y-3 text-xs">
               <div>
                 <p className="font-semibold text-muted-foreground uppercase mb-0.5">Shipping Address</p>
                 <p className="text-foreground whitespace-pre-wrap">
-                  {order.shippingAddress || "123 Tech Blvd, Suite 100, San Francisco, CA 94107"}
+                  {order.shippingAddress || "No shipping address provided"}
                 </p>
               </div>
               <div>
                 <p className="font-semibold text-muted-foreground uppercase mb-0.5">Billing Address</p>
                 <p className="text-foreground whitespace-pre-wrap">
-                  {order.billingAddress || "123 Tech Blvd, Suite 100, San Francisco, CA 94107"}
+                  {order.billingAddress || order.shippingAddress || "Same as shipping address"}
                 </p>
               </div>
               <div>
                 <p className="font-semibold text-muted-foreground uppercase mb-0.5">Payment Method</p>
-                <p className="text-foreground">{order.paymentMethod || "Credit Card"}</p>
+                <p className="text-foreground">{order.paymentMethod || "Cash on Delivery"}</p>
               </div>
             </div>
           </div>

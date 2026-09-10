@@ -118,6 +118,7 @@ export const getOrderById = async (req: AuthRequest, res: Response, next: NextFu
         shipments: {
           orderBy: { createdAt: "desc" },
           include: {
+            courier: true,
             trackingEvents: {
               orderBy: { timestamp: "desc" },
             },
