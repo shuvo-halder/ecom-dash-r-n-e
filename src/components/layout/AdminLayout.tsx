@@ -27,18 +27,22 @@ export function AdminLayout() {
   }, []);
 
   return (
-    <div className="relative min-h-screen bg-muted/40">
-      <Sidebar isOpen={isSidebarOpen} onToggle={() => setSidebarOpen(!isSidebarOpen)} />
+    <div className="relative min-h-screen bg-muted/40 print:bg-white print:min-h-0">
+      <div className="print:hidden">
+        <Sidebar isOpen={isSidebarOpen} onToggle={() => setSidebarOpen(!isSidebarOpen)} />
+      </div>
       
       <div className={cn(
-        "flex min-h-screen flex-col transition-all duration-300 ease-in-out",
+        "flex min-h-screen flex-col transition-all duration-300 ease-in-out print:ml-0 print:block print:min-h-0",
         isSidebarOpen ? "md:ml-64" : "md:ml-16"
       )}>
-        <Header onMenuClick={() => setSidebarOpen(!isSidebarOpen)} isSidebarOpen={isSidebarOpen} />
+        <div className="print:hidden">
+          <Header onMenuClick={() => setSidebarOpen(!isSidebarOpen)} isSidebarOpen={isSidebarOpen} />
+        </div>
         
-        <main className="flex-1 p-4 md:p-6 max-w-7xl mx-auto w-full">
+        <main className="flex-1 p-4 md:p-6 max-w-7xl mx-auto w-full print:p-0 print:m-0 print:max-w-none print:w-full print:block">
           {pathnames.length > 0 && (
-            <nav className="flex items-center text-sm text-muted-foreground mb-6 overflow-x-auto whitespace-nowrap py-1" aria-label="Breadcrumb">
+            <nav className="flex items-center text-sm text-muted-foreground mb-6 overflow-x-auto whitespace-nowrap py-1 print:hidden" aria-label="Breadcrumb">
               <Link to="/" className="hover:text-foreground transition-colors shrink-0">Home</Link>
               {pathnames.map((value, index) => {
                 const to = `/${pathnames.slice(0, index + 1).join('/')}`;

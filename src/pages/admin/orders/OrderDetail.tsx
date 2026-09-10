@@ -29,6 +29,7 @@ import { getUsers } from "../../../services/user.service";
 import { Button } from "../../../components/ui/button";
 import { Input } from "../../../components/ui/input";
 import { useAuth } from "../../../context/AuthContext";
+import { useBranding } from "../../../context/BrandingContext";
 import { notify } from "../../../lib/notify";
 import { PathaoShipmentCard } from "../../../components/admin/orders/PathaoShipmentCard";
 import { DeliveryBillingSection } from "../../../components/admin/orders/DeliveryBillingSection";
@@ -37,6 +38,7 @@ export function OrderDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { hasPermission } = useAuth();
+  const { branding } = useBranding();
 
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -218,9 +220,10 @@ export function OrderDetail() {
   );
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
-      {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4">
+    <>
+      <div className="p-6 space-y-6 max-w-7xl mx-auto print:hidden">
+        {/* Top Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4">
         <div className="flex items-center gap-3">
           <Button variant="outline" size="sm" onClick={() => navigate("/orders")}>
             <ArrowLeft className="w-4 h-4" />
@@ -583,12 +586,13 @@ export function OrderDetail() {
           </div>
         </div>
       </div>
+      </div>
 
       {/* Print Slip Modal */}
       {printType && (
-        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-card border rounded-lg shadow-2xl max-w-2xl w-full p-6 space-y-6 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b pb-4">
+        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-xs flex items-center justify-center p-4 print:static print:inset-auto print:block print:bg-white print:p-0">
+          <div className="bg-card border rounded-lg shadow-2xl max-w-2xl w-full p-6 space-y-6 max-h-[90vh] overflow-y-auto print:border-none print:shadow-none print:max-w-none print:max-h-none print:overflow-visible print:w-full print:m-0 print:p-0">
+            <div className="flex items-center justify-between border-b pb-4 print:border-none print:pb-0 print:hidden">
               <h3 className="text-lg font-bold">
                 {printType === "invoice" ? "Official Tax Invoice" : "Packing Slip"} - {order.orderNumber}
               </h3>
@@ -602,45 +606,57 @@ export function OrderDetail() {
               </div>
             </div>
 
-            <div className="space-y-6 text-sm">
+            <div className="space-y-6 text-sm print:text-black">
+              {/* Optional: Add a clean print-only title */}
+              <div className="hidden print:block text-center mb-6">
+                <h1 className="text-2xl font-bold uppercase tracking-wider">{printType === "invoice" ? "Tax Invoice" : "Packing Slip"}</h1>
+              </div>
+
               <div className="flex justify-between items-start">
                 <div>
-                  <h2 className="text-xl font-extrabold tracking-tight">E-Commerce Enterprise Inc.</h2>
-                  <p className="text-xs text-muted-foreground">100 Enterprise Way, Suite 400</p>
-                  <p className="text-xs text-muted-foreground">San Francisco, CA 94107</p>
-                  <p className="text-xs text-muted-foreground">support@enterprise-ecommerce.com</p>
+                  {(branding.invoiceLogo || branding.logoUrl || branding.adminPanelLogo) && (
+                    <img 
+                      src={branding.invoiceLogo || branding.logoUrl || branding.adminPanelLogo} 
+                      alt="Store Logo" 
+                      className="h-12 w-auto mb-2 object-contain" 
+                    />
+                  )}
+                  <h2 className="text-xl font-extrabold tracking-tight">{branding.siteName || "E-Commerce Enterprise Inc."}</h2>
+                  <p className="text-xs text-muted-foreground print:text-gray-600">100 Enterprise Way, Suite 400</p>
+                  <p className="text-xs text-muted-foreground print:text-gray-600">San Francisco, CA 94107</p>
+                  <p className="text-xs text-muted-foreground print:text-gray-600">support@enterprise-ecommerce.com</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-bold text-primary">{order.orderNumber}</p>
-                  <p className="text-xs text-muted-foreground">Date: {new Date(order.createdAt).toLocaleDateString()}</p>
-                  <p className="text-xs text-muted-foreground">Status: {order.status}</p>
+                  <p className="text-sm font-bold text-primary print:text-black">Order: {order.orderNumber}</p>
+                  <p className="text-xs text-muted-foreground print:text-gray-600">Date: {new Date(order.createdAt).toLocaleDateString()}</p>
+                  <p className="text-xs text-muted-foreground print:text-gray-600">Status: {order.status}</p>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 border-t pt-4">
+              <div className="grid grid-cols-2 gap-4 border-t pt-4 print:border-gray-300">
                 <div>
-                  <h4 className="font-semibold text-xs text-muted-foreground uppercase mb-1">Customer / Shipping Address</h4>
+                  <h4 className="font-semibold text-xs text-muted-foreground uppercase mb-1 print:text-gray-500">Customer / Shipping Address</h4>
                   <p className="font-medium">{order.customer?.firstName} {order.customer?.lastName}</p>
-                  <p className="text-xs text-muted-foreground">{order.customer?.email}</p>
-                  <p className="text-xs whitespace-pre-wrap">{order.shippingAddress || "123 Tech Blvd, Suite 100, San Francisco, CA 94107"}</p>
+                  <p className="text-xs text-muted-foreground print:text-gray-600">{order.customer?.email}</p>
+                  <p className="text-xs whitespace-pre-wrap print:text-gray-600">{order.shippingAddress || "123 Tech Blvd, Suite 100, San Francisco, CA 94107"}</p>
                 </div>
                 <div>
-                  <h4 className="font-semibold text-xs text-muted-foreground uppercase mb-1">Payment Method</h4>
+                  <h4 className="font-semibold text-xs text-muted-foreground uppercase mb-1 print:text-gray-500">Payment Method</h4>
                   <p className="font-medium">{order.paymentMethod || "Credit Card"}</p>
-                  <p className="text-xs text-muted-foreground">Payment Status: {order.paymentStatus || "Paid"}</p>
+                  <p className="text-xs text-muted-foreground print:text-gray-600">Payment Status: {order.paymentStatus || "Paid"}</p>
                 </div>
               </div>
 
-              <table className="w-full text-left border-t border-b">
+              <table className="w-full text-left border-t border-b print:border-gray-300">
                 <thead>
-                  <tr className="bg-muted/40 text-xs text-muted-foreground font-semibold">
+                  <tr className="bg-muted/40 text-xs text-muted-foreground font-semibold print:bg-gray-100 print:text-gray-700">
                     <th className="py-2 px-2">Item</th>
                     <th className="py-2 px-2 text-center">Qty</th>
                     {printType === "invoice" && <th className="py-2 px-2 text-right">Price</th>}
                     {printType === "invoice" && <th className="py-2 px-2 text-right">Subtotal</th>}
                   </tr>
                 </thead>
-                <tbody className="divide-y text-xs">
+                <tbody className="divide-y text-xs print:divide-gray-300">
                   {order.items?.map((item: any, idx: number) => (
                     <tr key={idx}>
                       <td className="py-2 px-2 font-medium">{item.product?.name || "Product"}</td>
@@ -655,9 +671,9 @@ export function OrderDetail() {
               {printType === "invoice" && (
                 <div className="flex justify-end text-sm">
                   <div className="w-48 space-y-1">
-                    <div className="flex justify-between font-bold text-base border-t pt-1">
+                    <div className="flex justify-between font-bold text-base border-t pt-1 print:border-gray-300">
                       <span>Total Amount:</span>
-                      <span className="text-primary">৳{Number(order.totalAmount || 0).toFixed(2)}</span>
+                      <span className="text-primary print:text-black">৳{Number(order.totalAmount || 0).toFixed(2)}</span>
                     </div>
                   </div>
                 </div>
@@ -666,6 +682,6 @@ export function OrderDetail() {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
