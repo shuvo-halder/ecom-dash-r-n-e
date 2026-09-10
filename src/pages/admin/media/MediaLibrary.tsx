@@ -1,6 +1,6 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { mediaService, MediaAssetItem } from '../../../services/media.service';
+import { mediaService, MediaAssetItem, MediaUsageResult } from '../../../services/media.service';
 import { useAuth } from '../../../context/AuthContext';
 import { Card, CardContent } from '../../../components/ui/card';
 import { Input } from '../../../components/ui/input';
@@ -23,7 +23,10 @@ import {
   CheckSquare,
   Square,
   Cloud,
-  FileCheck
+  FileCheck,
+  ShieldAlert,
+  ShieldCheck,
+  AlertTriangle
 } from 'lucide-react';
 import { ConfirmDialog } from '../../../components/common/ConfirmDialog';
 import { notify } from '../../../lib/notify';
@@ -56,6 +59,24 @@ export function MediaLibrary() {
   const [assetToDelete, setAssetToDelete] = useState<{ id: string; filename?: string } | null>(null);
   const [isBatchDeleteConfirmOpen, setIsBatchDeleteConfirmOpen] = useState(false);
 
+  // Safe Media Usage Detection States
+  const [isCheckingUsageId, setIsCheckingUsageId] = useState<string | null>(null);
+  const [usageBlockedAsset, setUsageBlockedAsset] = useState<{
+    id: string;
+    filename?: string;
+    usage: MediaUsageResult;
+  } | null>(null);
+
+  const [activeAssetUsage, setActiveAssetUsage] = useState<MediaUsageResult | null>(null);
+  const [isLoadingActiveUsage, setIsLoadingActiveUsage] = useState(false);
+
+  // Batch delete analysis
+  const [isCheckingBatchUsage, setIsCheckingBatchUsage] = useState(false);
+  const [batchDeleteAnalysis, setBatchDeleteAnalysis] = useState<{
+    blocked: Array<{ id: string; filename?: string; usage: MediaUsageResult }>;
+    eligible: Array<{ id: string; filename?: string }>;
+  } | null>(null);
+
   // Upload States
   const [dragActive, setDragActive] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -67,6 +88,20 @@ export function MediaLibrary() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Fetch usage when activeAsset is inspected
+  useEffect(() => {
+    if (activeAsset?.id) {
+      setIsLoadingActiveUsage(true);
+      mediaService
+        .getAssetUsage(activeAsset.id)
+        .then((usage) => setActiveAssetUsage(usage))
+        .catch(() => setActiveAssetUsage(null))
+        .finally(() => setIsLoadingActiveUsage(false));
+    } else {
+      setActiveAssetUsage(null);
+    }
+  }, [activeAsset?.id]);
 
   // Query assets
   const { data: assets = [], isLoading, refetch } = useQuery({
@@ -138,9 +173,21 @@ export function MediaLibrary() {
     }
   };
 
-  // Single Delete
-  const handleDeleteSingle = (id: string, filename?: string) => {
-    setAssetToDelete({ id, filename });
+  // Single Delete with Safe Usage Inspection
+  const handleDeleteSingle = async (id: string, filename?: string) => {
+    setIsCheckingUsageId(id);
+    try {
+      const usage = await mediaService.getAssetUsage(id);
+      if (usage.used) {
+        setUsageBlockedAsset({ id, filename, usage });
+      } else {
+        setAssetToDelete({ id, filename });
+      }
+    } catch (err: any) {
+      notify.apiError(err, 'Failed to inspect media asset usage');
+    } finally {
+      setIsCheckingUsageId(null);
+    }
   };
 
   const confirmDeleteSingle = async () => {
@@ -153,28 +200,78 @@ export function MediaLibrary() {
       notify.success('Asset Deleted', `Media asset was removed.`);
       setAssetToDelete(null);
     } catch (err: any) {
-      notify.apiError(err, 'Failed to delete asset');
+      const errorData = err?.response?.data?.error;
+      if (errorData?.code === 'MEDIA_ASSET_IN_USE') {
+        setUsageBlockedAsset({
+          id: assetToDelete.id,
+          filename: assetToDelete.filename,
+          usage: errorData.details || { used: true, referenceCount: 1, references: [] },
+        });
+      } else {
+        notify.apiError(err, 'Failed to delete asset');
+      }
       setAssetToDelete(null);
     }
   };
 
-  // Batch Delete
-  const handleBatchDelete = () => {
+  // Batch Delete with Safe Usage Analysis
+  const handleBatchDelete = async () => {
     if (selectedIds.length === 0) return;
-    setIsBatchDeleteConfirmOpen(true);
+    setIsCheckingBatchUsage(true);
+    try {
+      const checks = await Promise.all(
+        selectedIds.map(async (id) => {
+          const asset = assets.find((a) => a.id === id);
+          try {
+            const usage = await mediaService.getAssetUsage(id);
+            return { id, filename: asset?.filename, usage };
+          } catch {
+            return {
+              id,
+              filename: asset?.filename,
+              usage: { used: false, referenceCount: 0, references: [] },
+            };
+          }
+        })
+      );
+
+      const blocked = checks.filter((c) => c.usage.used);
+      const eligible = checks
+        .filter((c) => !c.usage.used)
+        .map((c) => ({ id: c.id, filename: c.filename }));
+
+      setBatchDeleteAnalysis({ blocked, eligible });
+      setIsBatchDeleteConfirmOpen(true);
+    } catch (err: any) {
+      notify.apiError(err, 'Failed to inspect media usage for selected assets');
+    } finally {
+      setIsCheckingBatchUsage(false);
+    }
   };
 
   const confirmBatchDelete = async () => {
+    if (!batchDeleteAnalysis || batchDeleteAnalysis.eligible.length === 0) {
+      setIsBatchDeleteConfirmOpen(false);
+      return;
+    }
     setIsBatchDeleting(true);
     try {
-      for (const id of selectedIds) {
-        await mediaService.deleteAsset(id);
-      }
-      const count = selectedIds.length;
-      setSelectedIds([]);
+      const eligibleIds = batchDeleteAnalysis.eligible.map((e) => e.id);
+      const res = await mediaService.batchDeleteAssets(eligibleIds);
+
       queryClient.invalidateQueries({ queryKey: ['media-assets'] });
-      notify.success('Batch Delete Complete', `${count} asset(s) deleted successfully.`);
+      setSelectedIds([]);
       setIsBatchDeleteConfirmOpen(false);
+
+      if (batchDeleteAnalysis.blocked.length > 0) {
+        notify.success(
+          'Batch Deletion Finished',
+          `Deleted ${res.deletedCount} unused asset(s). ${batchDeleteAnalysis.blocked.length} asset(s) in use were safely preserved.`
+        );
+      } else {
+        notify.success('Batch Delete Complete', `${res.deletedCount} asset(s) deleted successfully.`);
+      }
+      setBatchDeleteAnalysis(null);
     } catch (err: any) {
       notify.apiError(err, 'Error during batch delete');
       setIsBatchDeleteConfirmOpen(false);
@@ -329,11 +426,19 @@ export function MediaLibrary() {
                 variant="destructive"
                 size="sm"
                 onClick={handleBatchDelete}
-                disabled={isBatchDeleting}
+                disabled={isBatchDeleting || isCheckingBatchUsage}
                 className="gap-1.5 text-xs"
               >
-                {isBatchDeleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-                Delete ({selectedIds.length})
+                {isBatchDeleting || isCheckingBatchUsage ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Trash2 className="h-3.5 w-3.5" />
+                )}
+                {isCheckingBatchUsage
+                  ? 'Checking Usage...'
+                  : isBatchDeleting
+                  ? 'Deleting...'
+                  : `Delete (${selectedIds.length})`}
               </Button>
             )}
 
@@ -443,10 +548,15 @@ export function MediaLibrary() {
                       {canDelete && (
                         <button
                           onClick={() => handleDeleteSingle(asset.id, asset.filename)}
-                          className="p-1 hover:text-red-600"
+                          disabled={isCheckingUsageId === asset.id}
+                          className="p-1 hover:text-red-600 disabled:opacity-50"
                           title="Delete"
                         >
-                          <Trash2 className="h-3.5 w-3.5" />
+                          {isCheckingUsageId === asset.id ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+                          ) : (
+                            <Trash2 className="h-3.5 w-3.5" />
+                          )}
                         </button>
                       )}
                     </div>
@@ -538,10 +648,15 @@ export function MediaLibrary() {
                             variant="ghost"
                             size="sm"
                             onClick={() => handleDeleteSingle(asset.id, asset.filename)}
-                            className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                            disabled={isCheckingUsageId === asset.id}
+                            className="h-8 w-8 p-0 text-red-600 hover:text-red-700 disabled:opacity-50"
                             title="Delete"
                           >
-                            <Trash2 className="h-4 w-4" />
+                            {isCheckingUsageId === asset.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
                           </Button>
                         )}
                       </div>
@@ -618,6 +733,48 @@ export function MediaLibrary() {
                   </div>
                 </div>
 
+                {/* Safe Usage Status Card */}
+                <div className="border rounded-lg p-3 bg-muted/20 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Reference Status
+                    </span>
+                    {isLoadingActiveUsage ? (
+                      <span className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Loader2 className="h-3 w-3 animate-spin" /> Checking references...
+                      </span>
+                    ) : activeAssetUsage?.used ? (
+                      <Badge variant="destructive" className="gap-1 text-[11px]">
+                        <ShieldAlert className="h-3 w-3" /> In Use ({activeAssetUsage.referenceCount} reference{activeAssetUsage.referenceCount > 1 ? 's' : ''})
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-green-600 border-green-300 dark:border-green-800 bg-green-50 dark:bg-green-950/40 gap-1 text-[11px]">
+                        <ShieldCheck className="h-3 w-3" /> Unused (Safe to delete)
+                      </Badge>
+                    )}
+                  </div>
+
+                  {activeAssetUsage?.used && (
+                    <div className="space-y-1.5 pt-1">
+                      <p className="text-[11px] text-muted-foreground leading-tight">
+                        Referenced across your catalog or CMS. Protected against deletion:
+                      </p>
+                      <div className="max-h-28 overflow-y-auto space-y-1 pr-1">
+                        {activeAssetUsage.references.map((ref, idx) => (
+                          <div key={idx} className="text-[11px] bg-background p-1.5 rounded border flex items-center justify-between gap-2">
+                            <span className="font-medium truncate text-foreground" title={ref.entityName}>
+                              {ref.entityName}
+                            </span>
+                            <span className="text-muted-foreground text-[10px] shrink-0 font-mono">
+                              {ref.type} &bull; {ref.field}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 <div>
                   <span className="text-muted-foreground block font-medium mb-1">Asset URL</span>
                   <div className="flex gap-2">
@@ -644,9 +801,15 @@ export function MediaLibrary() {
                   variant="destructive"
                   size="sm"
                   onClick={() => handleDeleteSingle(activeAsset.id, activeAsset.filename)}
+                  disabled={isCheckingUsageId === activeAsset.id}
                   className="gap-1.5"
                 >
-                  <Trash2 className="h-4 w-4" /> Delete Asset
+                  {isCheckingUsageId === activeAsset.id ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-4 w-4" />
+                  )}
+                  {activeAssetUsage?.used ? 'Delete Asset (Protected)' : 'Delete Asset'}
                 </Button>
               )}
               <Button variant="outline" size="sm" onClick={() => setActiveAsset(null)}>
@@ -657,7 +820,63 @@ export function MediaLibrary() {
         </div>
       )}
 
-      {/* Single Asset Delete Dialog */}
+      {/* Usage Blocked Dialog (Single Asset) */}
+      {usageBlockedAsset && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-card text-card-foreground p-6 shadow-2xl rounded-xl border border-destructive/30 max-w-lg w-full space-y-4 animate-in fade-in-0 zoom-in-95">
+            <div className="flex items-start gap-3">
+              <div className="p-2.5 rounded-full bg-destructive/15 text-destructive shrink-0">
+                <ShieldAlert className="h-6 w-6" />
+              </div>
+              <div className="flex-1 space-y-1">
+                <h3 className="text-lg font-bold tracking-tight text-foreground">
+                  Cannot Delete Asset — Currently In Use
+                </h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  The media asset {usageBlockedAsset.filename ? <strong>"{usageBlockedAsset.filename}"</strong> : 'selected'} cannot be deleted because it is actively referenced in <strong>{usageBlockedAsset.usage.referenceCount}</strong> place{usageBlockedAsset.usage.referenceCount > 1 ? 's' : ''} across your store.
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-muted/50 border rounded-lg p-3 max-h-56 overflow-y-auto space-y-2">
+              <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center justify-between">
+                <span>Detected References ({usageBlockedAsset.usage.references.length})</span>
+                <span className="text-[11px] text-destructive font-normal">Deletion Blocked</span>
+              </div>
+              <div className="space-y-1.5">
+                {usageBlockedAsset.usage.references.map((ref, idx) => (
+                  <div key={idx} className="text-xs bg-background p-2 rounded border flex flex-col gap-0.5">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-foreground truncate max-w-[280px]" title={ref.entityName}>
+                        {ref.entityName}
+                      </span>
+                      <Badge variant={ref.status === 'ACTIVE' ? 'secondary' : 'outline'} className="text-[10px]">
+                        {ref.status}
+                      </Badge>
+                    </div>
+                    <span className="text-muted-foreground text-[11px]">
+                      Module: <span className="font-medium text-foreground">{ref.type}</span> &bull; Field: <span className="font-mono text-primary">{ref.field}</span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-lg text-xs text-amber-800 dark:text-amber-300 flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 shrink-0" />
+              <span>To delete this asset safely, remove or reassign its reference from the entities listed above first.</span>
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <Button variant="default" onClick={() => setUsageBlockedAsset(null)}>
+                Understood, Keep Asset Safe
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Single Asset Delete Dialog (Confirmed Unused) */}
       <ConfirmDialog
         isOpen={!!assetToDelete}
         onOpenChange={(open) => !open && setAssetToDelete(null)}
@@ -672,21 +891,121 @@ export function MediaLibrary() {
         onConfirm={confirmDeleteSingle}
       />
 
-      {/* Batch Delete Dialog */}
-      <ConfirmDialog
-        isOpen={isBatchDeleteConfirmOpen}
-        onOpenChange={(open) => !open && setIsBatchDeleteConfirmOpen(false)}
-        title="Batch Delete Media Assets"
-        description={
-          <>
-            Are you sure you want to permanently delete <strong>{selectedIds.length}</strong> selected asset(s)?
-          </>
-        }
-        confirmText={`Delete ${selectedIds.length} Assets`}
-        variant="destructive"
-        isLoading={isBatchDeleting}
-        onConfirm={confirmBatchDelete}
-      />
+      {/* Batch Delete Blocked Dialog (All Selected In Use) */}
+      {isBatchDeleteConfirmOpen && batchDeleteAnalysis && batchDeleteAnalysis.eligible.length === 0 && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-card text-card-foreground p-6 shadow-2xl rounded-xl border border-destructive/30 max-w-lg w-full space-y-4 animate-in fade-in-0 zoom-in-95">
+            <div className="flex items-start gap-3">
+              <div className="p-2.5 rounded-full bg-destructive/15 text-destructive shrink-0">
+                <ShieldAlert className="h-6 w-6" />
+              </div>
+              <div className="flex-1 space-y-1">
+                <h3 className="text-lg font-bold tracking-tight text-foreground">
+                  Batch Delete Blocked
+                </h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  All <strong>{batchDeleteAnalysis.blocked.length}</strong> selected asset(s) are currently in use across your catalog or content. None can be deleted.
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-muted/50 border rounded-lg p-3 max-h-56 overflow-y-auto space-y-2">
+              <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Protected Assets ({batchDeleteAnalysis.blocked.length})
+              </div>
+              <div className="space-y-1.5">
+                {batchDeleteAnalysis.blocked.map((b, idx) => (
+                  <div key={idx} className="text-xs bg-background p-2 rounded border space-y-0.5">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-foreground truncate max-w-[240px]">
+                        {b.filename || b.id}
+                      </span>
+                      <Badge variant="destructive" className="text-[10px]">
+                        {b.usage.referenceCount} reference(s)
+                      </Badge>
+                    </div>
+                    <div className="text-[11px] text-muted-foreground truncate">
+                      {b.usage.references.map((r) => `${r.entityName} (${r.type})`).join(', ')}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsBatchDeleteConfirmOpen(false);
+                  setBatchDeleteAnalysis(null);
+                }}
+              >
+                Close
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Partial Batch Delete Dialog (Some In Use, Some Unused) */}
+      {isBatchDeleteConfirmOpen && batchDeleteAnalysis && batchDeleteAnalysis.eligible.length > 0 && batchDeleteAnalysis.blocked.length > 0 && (
+        <ConfirmDialog
+          isOpen={isBatchDeleteConfirmOpen}
+          onOpenChange={(open) => {
+            if (!open) {
+              setIsBatchDeleteConfirmOpen(false);
+              setBatchDeleteAnalysis(null);
+            }
+          }}
+          title="Partial Batch Deletion (Usage Protected)"
+          description={
+            <div className="space-y-3">
+              <p>
+                <strong>{batchDeleteAnalysis.blocked.length}</strong> of {selectedIds.length} asset(s) are in use and will be <strong>safely preserved</strong>.
+              </p>
+              <p>
+                <strong>{batchDeleteAnalysis.eligible.length}</strong> unused asset(s) will be permanently deleted.
+              </p>
+              <div className="p-2 bg-muted rounded border text-xs text-muted-foreground max-h-28 overflow-y-auto space-y-1">
+                <span className="font-medium text-foreground block">Preserved Assets (In Use):</span>
+                {batchDeleteAnalysis.blocked.map((b, i) => (
+                  <div key={i} className="flex justify-between">
+                    <span className="truncate max-w-[220px]">{b.filename || b.id}</span>
+                    <span className="text-[10px] text-destructive">({b.usage.referenceCount} ref)</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          }
+          confirmText={`Delete ${batchDeleteAnalysis.eligible.length} Unused Assets`}
+          variant="destructive"
+          isLoading={isBatchDeleting}
+          onConfirm={confirmBatchDelete}
+        />
+      )}
+
+      {/* Batch Delete Dialog (All Selected Unused) */}
+      {isBatchDeleteConfirmOpen && batchDeleteAnalysis && batchDeleteAnalysis.blocked.length === 0 && (
+        <ConfirmDialog
+          isOpen={isBatchDeleteConfirmOpen}
+          onOpenChange={(open) => {
+            if (!open) {
+              setIsBatchDeleteConfirmOpen(false);
+              setBatchDeleteAnalysis(null);
+            }
+          }}
+          title="Batch Delete Media Assets"
+          description={
+            <>
+              Are you sure you want to permanently delete <strong>{batchDeleteAnalysis.eligible.length}</strong> selected asset(s)? None of them are currently in use.
+            </>
+          }
+          confirmText={`Delete ${batchDeleteAnalysis.eligible.length} Assets`}
+          variant="destructive"
+          isLoading={isBatchDeleting}
+          onConfirm={confirmBatchDelete}
+        />
+      )}
     </div>
   );
 }

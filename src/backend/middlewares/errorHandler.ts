@@ -119,6 +119,7 @@ export const errorHandler = (
     error: {
       code,
       message,
+      ...(err.details !== undefined ? { details: err.details } : {}),
     },
   });
 };

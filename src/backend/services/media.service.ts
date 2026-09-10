@@ -2,6 +2,7 @@ import path from 'path';
 import { cloudinary, isCloudinaryConfigured } from '../config/cloudinary';
 import { prisma } from '../config/db';
 import { AppError } from '../utils/AppError';
+import { MediaUsageService } from './media-usage.service';
 
 export interface UploadFileOptions {
   folder?: string;
@@ -346,8 +347,21 @@ export class MediaService {
       },
     });
 
+    // 1. Safe Media Usage Detection: Check if asset is referenced anywhere across DB
+    const usage = await MediaUsageService.checkAssetUsage(assetOrPublicId, asset || undefined);
+    if (usage.used) {
+      throw new AppError(
+        'This media asset is currently in use and cannot be deleted.',
+        400,
+        'MEDIA_ASSET_IN_USE',
+        true,
+        usage
+      );
+    }
+
     const publicId = asset?.cloudinaryPublicId || asset?.publicId || assetOrPublicId;
 
+    // 2. Destroy Cloudinary file ONLY AFTER confirming asset is completely unused
     if (publicId && !publicId.startsWith('local_') && isCloudinaryConfigured()) {
       try {
         await cloudinary.uploader.destroy(publicId);
@@ -383,6 +397,53 @@ export class MediaService {
     }
 
     return true;
+  }
+
+  /**
+   * Batch delete multiple media assets safely
+   */
+  static async batchDeleteAssets(ids: string[]): Promise<{
+    deletedCount: number;
+    deletedIds: string[];
+    blockedCount: number;
+    blocked: Array<{ id: string; reason: string; usage: any }>;
+  }> {
+    const deletedIds: string[] = [];
+    const blocked: Array<{ id: string; reason: string; usage: any }> = [];
+
+    for (const id of ids) {
+      const usage = await MediaUsageService.checkAssetUsage(id);
+      if (usage.used) {
+        blocked.push({
+          id,
+          reason: 'This media asset is currently in use and cannot be deleted.',
+          usage,
+        });
+        continue;
+      }
+
+      try {
+        await this.deleteAsset(id);
+        deletedIds.push(id);
+      } catch (err: any) {
+        if (err?.code === 'MEDIA_ASSET_IN_USE') {
+          blocked.push({
+            id,
+            reason: err.message,
+            usage: err.details,
+          });
+        } else {
+          throw err;
+        }
+      }
+    }
+
+    return {
+      deletedCount: deletedIds.length,
+      deletedIds,
+      blockedCount: blocked.length,
+      blocked,
+    };
   }
 
   /**

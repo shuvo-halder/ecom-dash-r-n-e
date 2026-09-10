@@ -75,6 +75,12 @@ router.post(
 // POST /api/v1/media/upload-multiple - Multiple files upload (Media.Write)
 router.post('/upload-multiple', requirePermission('Media', 'Write'), upload.array('files', 10), MediaController.uploadMultiple);
 
+// GET /api/v1/media/:id/usage - Check asset usage (Media.Read)
+router.get('/:id/usage', requirePermission('Media', 'Read'), MediaController.getAssetUsage);
+
+// POST /api/v1/media/batch-delete - Batch delete assets safely (Media.Delete)
+router.post('/batch-delete', requirePermission('Media', 'Delete'), MediaController.batchDeleteAssets);
+
 // PUT /api/v1/media/:id - Replace asset (Media.Write)
 router.put('/:id', requirePermission('Media', 'Write'), upload.single('file'), MediaController.replaceAsset);
 

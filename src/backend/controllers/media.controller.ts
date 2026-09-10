@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { MediaService } from '../services/media.service';
+import { MediaUsageService } from '../services/media-usage.service';
 import { ProductMediaService } from '../services/product-media.service';
 import { AppError } from '../utils/AppError';
 
@@ -58,6 +59,23 @@ export class MediaController {
   }
 
   /**
+   * Safe usage inspection for a media asset across all entities
+   */
+  static async getAssetUsage(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      const usage = await MediaUsageService.checkAssetUsage(id);
+
+      res.status(200).json({
+        status: 'success',
+        data: usage,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
    * Delete asset
    */
   static async deleteAsset(req: Request, res: Response, next: NextFunction) {
@@ -68,6 +86,28 @@ export class MediaController {
       res.status(200).json({
         status: 'success',
         message: 'Media asset deleted successfully',
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Batch delete multiple media assets safely
+   */
+  static async batchDeleteAssets(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { ids } = req.body;
+      if (!Array.isArray(ids) || ids.length === 0) {
+        throw new AppError('Array of asset IDs is required', 400, 'BAD_REQUEST');
+      }
+
+      const result = await MediaService.batchDeleteAssets(ids);
+
+      res.status(200).json({
+        status: 'success',
+        message: `${result.deletedCount} asset(s) deleted. ${result.blockedCount} asset(s) blocked due to active usage.`,
+        data: result,
       });
     } catch (error) {
       next(error);
