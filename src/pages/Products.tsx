@@ -7,7 +7,7 @@ import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Badge } from '@/src/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/src/components/ui/dropdown-menu';
-import { Plus, Search, MoreHorizontal, Edit, Eye, Trash2 } from 'lucide-react';
+import { Plus, Search, MoreHorizontal, Edit, Eye, Trash2, Archive } from 'lucide-react';
 import { getProducts, deleteProduct } from '../services/product.service';
 import { PermissionGuard } from '../components/layout/PermissionGuard';
 import { useAuth } from '../context/AuthContext';
@@ -70,6 +70,14 @@ export function Products() {
               <Input type="search" aria-label="Search products" placeholder="Search products..." className="pl-8" />
             </div>
             <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => navigate('/admin/archive?entityType=products')}
+                className="gap-1.5"
+              >
+                <Archive className="h-3.5 w-3.5 text-muted-foreground" /> Archived Products
+              </Button>
               <Button variant="outline" size="sm">Filter</Button>
               <Button variant="outline" size="sm">Export</Button>
             </div>

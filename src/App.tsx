@@ -65,6 +65,7 @@ import { ShipmentsList } from './pages/admin/shipments/ShipmentsList';
 import { ShipmentDetails } from './pages/admin/shipments/ShipmentDetails';
 import { Settings } from './pages/admin/settings/Settings';
 import { NotificationsList } from './pages/admin/notifications/NotificationsList';
+import { ArchiveList } from './pages/admin/archive/ArchiveList';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -167,6 +168,8 @@ export default function App() {
                   <Route path="admin/shipments/:id" element={<RoutePermissionGuard module="Shipments" action="read"><ShipmentDetails /></RoutePermissionGuard>} />
                   
                   <Route path="admin/notifications" element={<RoutePermissionGuard module="Notifications" action="read"><NotificationsList /></RoutePermissionGuard>} />
+                  <Route path="admin/archive" element={<RoutePermissionGuard module="Archive" action="read"><ArchiveList /></RoutePermissionGuard>} />
+                  <Route path="archive" element={<Navigate to="/admin/archive" replace />} />
                   
                   <Route path="settings" element={<RoutePermissionGuard module="Settings" action="read"><Settings /></RoutePermissionGuard>} />
                   <Route path="admin/settings" element={<RoutePermissionGuard module="Settings" action="read"><Settings /></RoutePermissionGuard>} />

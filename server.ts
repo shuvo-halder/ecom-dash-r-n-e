@@ -49,6 +49,7 @@ import mediaRouter, { richTextUpload, richTextUploadMiddleware } from "./src/bac
 import { MediaController } from "./src/backend/controllers/media.controller";
 import { requireAuth, requirePermission } from "./src/backend/middlewares/auth";
 import faqRouter from "./src/backend/routes/faq.routes";
+import archiveRouter from "./src/backend/routes/archive.routes";
 import settingRouter from "./src/backend/routes/setting.routes";
 import courierRouter from "./src/backend/routes/courier.routes";
 import seoRouter from "./src/backend/routes/seo.routes";
@@ -254,6 +255,7 @@ async function startServer() {
   apiRouter.use("/faqs", faqRouter);
   apiRouter.use("/seo", seoRouter);
   apiRouter.use("/reviews", reviewRouter);
+  apiRouter.use("/archive", archiveRouter);
   apiRouter.use("/settings", settingRouter);
   apiRouter.use("/storefront/v1/settings", storefrontSettingRouter);
   

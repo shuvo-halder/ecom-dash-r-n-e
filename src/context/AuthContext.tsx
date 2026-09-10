@@ -119,16 +119,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
   };
 
-  const isSuperAdmin = Boolean(user && user.role && user.role.name === "SuperAdmin");
+  const isSuperAdmin = Boolean(
+    user &&
+    user.role &&
+    (user.role.name === "SuperAdmin" || user.role.name === "Super Admin")
+  );
 
   const hasPermission = (moduleOrPerm: PermissionInput, action?: string): boolean => {
     if (!user) return false;
     // SuperAdmin has full access based on authenticated session data
-    if (user.role?.name === "SuperAdmin") return true;
+    if (user.role?.name === "SuperAdmin" || user.role?.name === "Super Admin") return true;
     if (!user.role?.permissions || !Array.isArray(user.role.permissions)) return false;
 
     const target = parsePermission(moduleOrPerm, action);
     if (!target.module) return false;
+
+    // Special case for global Archive access: allow if user has any read permission across catalog, sales, marketing, content, or system
+    if (target.module === "archive" && (target.action === "read" || target.action === "write")) {
+      const hasExplicitArchive = user.role.permissions.some(
+        (p) => (p.module || "").trim().toLowerCase() === "archive"
+      );
+      if (hasExplicitArchive) return true;
+
+      // Allow archive page access if admin has read permissions to any primary module
+      const allowedModules = [
+        "products", "categories", "brands", "orders", "payments", "refunds",
+        "returns", "shipments", "coupons", "promotions", "marketing", "banners",
+        "popups", "cms", "landingpages", "blog", "faq", "users", "roles"
+      ];
+      return user.role.permissions.some((p) => {
+        const pMod = (p.module || "").trim().toLowerCase();
+        return allowedModules.includes(pMod) || pMod === "all" || pMod === "*";
+      });
+    }
 
     return user.role.permissions.some((p) => {
       const permMod = (p.module || '').trim().toLowerCase();
