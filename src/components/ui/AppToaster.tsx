@@ -22,13 +22,13 @@ export function AppToaster() {
           closeButton:
             "group-[.toast]:bg-background group-[.toast]:text-foreground group-[.toast]:border-border group-[.toast]:hover:bg-muted group-[.toast]:transition-colors",
           error:
-            "group-[.toaster]:!bg-destructive/10 group-[.toaster]:!border-destructive/30 group-[.toaster]:!text-destructive dark:group-[.toaster]:!text-destructive-foreground",
+            "group-[.toaster]:!bg-background group-[.toaster]:!border-destructive group-[.toaster]:!text-destructive dark:group-[.toaster]:!text-red-400",
           success:
-            "group-[.toaster]:!bg-emerald-500/10 group-[.toaster]:!border-emerald-500/30 group-[.toaster]:!text-emerald-700 dark:group-[.toaster]:!text-emerald-300",
+            "group-[.toaster]:!bg-background group-[.toaster]:!border-emerald-500 group-[.toaster]:!text-emerald-600 dark:group-[.toaster]:!text-emerald-400",
           warning:
-            "group-[.toaster]:!bg-amber-500/10 group-[.toaster]:!border-amber-500/30 group-[.toaster]:!text-amber-800 dark:group-[.toaster]:!text-amber-300",
+            "group-[.toaster]:!bg-background group-[.toaster]:!border-amber-500 group-[.toaster]:!text-amber-600 dark:group-[.toaster]:!text-amber-400",
           info:
-            "group-[.toaster]:!bg-blue-500/10 group-[.toaster]:!border-blue-500/30 group-[.toaster]:!text-blue-800 dark:group-[.toaster]:!text-blue-300",
+            "group-[.toaster]:!bg-background group-[.toaster]:!border-blue-500 group-[.toaster]:!text-blue-600 dark:group-[.toaster]:!text-blue-400",
         },
       }}
       style={{
