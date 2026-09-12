@@ -346,6 +346,7 @@ model Product {
   deletedAt    DateTime?
   WishlistItem WishlistItem[]
   cartItems    CartItem[]
+  productFaqs  ProductFaq[]
 
   @@index([categoryId])
   @@index([brandId])
@@ -888,12 +889,29 @@ model FAQ {
   category   FAQCategory? @relation(fields: [categoryId], references: [id])
   orderIndex Int          @default(0)
   isActive   Boolean      @default(true)
-  createdAt  DateTime     @default(now())
-  updatedAt  DateTime     @updatedAt
-  deletedAt  DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  deletedAt   DateTime?
+  productFaqs ProductFaq[]
 
   @@index([categoryId])
   @@index([isActive, orderIndex])
+}
+
+model ProductFaq {
+  id        String   @id @default(uuid())
+  productId String
+  faqId     String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  faq     FAQ     @relation(fields: [faqId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, faqId])
+  @@index([productId, sortOrder])
+  @@index([faqId])
 }
 
 model CustomerAddress {
