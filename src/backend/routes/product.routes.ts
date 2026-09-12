@@ -15,7 +15,18 @@ import {
   getProductVariants,
   createProductVariant
 } from "../controllers/variant.controller";
+import {
+  getProductFaqs,
+  assignProductFaq,
+  reorderProductFaqs,
+  removeProductFaq,
+} from "../controllers/product-faq.controller";
 import { requireAuth, requirePermission } from "../middlewares/auth";
+import { validateBody, validateParamsUUID } from "../middlewares/validation";
+import {
+  assignProductFaqSchema,
+  reorderProductFaqsSchema,
+} from "../validators/product-faq.validator";
 
 const router = express.Router();
 
@@ -33,6 +44,34 @@ router.route("/")
 router.route("/:productId/variants")
   .get(requirePermission("Products", "read"), getProductVariants)
   .post(requirePermission("Products", "write"), createProductVariant);
+
+// Product FAQ Routes
+router.get(
+  "/:productId/faqs",
+  requirePermission("Products", "read"),
+  validateParamsUUID(["productId"]),
+  getProductFaqs
+);
+router.post(
+  "/:productId/faqs",
+  requirePermission("Products", "write"),
+  validateParamsUUID(["productId"]),
+  validateBody(assignProductFaqSchema),
+  assignProductFaq
+);
+router.put(
+  "/:productId/faqs/reorder",
+  requirePermission("Products", "write"),
+  validateParamsUUID(["productId"]),
+  validateBody(reorderProductFaqsSchema),
+  reorderProductFaqs
+);
+router.delete(
+  "/:productId/faqs/:faqId",
+  requirePermission("Products", "write"),
+  validateParamsUUID(["productId", "faqId"]),
+  removeProductFaq
+);
 
 // Product Media Routes
 router.post("/:id/images", requirePermission("Products", "write"), upload.single("image"), uploadProductImage);

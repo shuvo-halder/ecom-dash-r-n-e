@@ -286,3 +286,5 @@ export const updateGlobalSeoSchema = z.object({
   defaultOgImage: z.string().url("Invalid URL").optional().nullable(),
   robotsConfig: z.string().optional().nullable(),
 });
+
+export * from "../validators/product-faq.validator";

@@ -404,3 +404,10 @@ export const setPrimaryProductImage = asyncHandler(async (req: Request, res: Res
   const updatedImages = await ProductMediaService.setPrimaryImage(id, imageId);
   res.status(200).json({ success: true, data: updatedImages });
 });
+
+export {
+  getProductFaqs,
+  assignProductFaq,
+  reorderProductFaqs,
+  removeProductFaq,
+} from "./product-faq.controller";
