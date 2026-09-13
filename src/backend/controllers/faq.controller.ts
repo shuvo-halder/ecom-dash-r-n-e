@@ -107,13 +107,20 @@ export const createCategory = async (req: Request, res: Response, next: NextFunc
 export const deleteCategory = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    
-    // Check if any active FAQs are linked to this category
+
+    const category = await prisma.fAQCategory.findUnique({
+      where: { id },
+    });
+    if (!category) {
+      throw new AppError('Category not found', 404, "NOT_FOUND");
+    }
+
+    // Check if any FAQs (active, inactive, or archived) are linked to this category
     const linkedCount = await prisma.fAQ.count({
-      where: { categoryId: id, deletedAt: null }
+      where: { categoryId: id }
     });
     if (linkedCount > 0) {
-      throw new AppError('Cannot delete category because it contains active FAQs', 400, "BAD_REQUEST");
+      throw new AppError('Cannot delete category because it contains FAQs', 400, "BAD_REQUEST");
     }
 
     await prisma.fAQCategory.delete({ where: { id } });
