@@ -70,6 +70,7 @@ export function FaqManagement() {
   const [faqCategoryId, setFaqCategoryId] = useState<string>('');
   const [faqOrderIndex, setFaqOrderIndex] = useState<number>(0);
   const [faqIsActive, setFaqIsActive] = useState(true);
+  const [faqIsGlobal, setFaqIsGlobal] = useState(true);
   const [faqFormError, setFaqFormError] = useState<string | null>(null);
 
   // Category Form State
@@ -155,6 +156,7 @@ export function FaqManagement() {
     setFaqCategoryId('');
     setFaqOrderIndex(0);
     setFaqIsActive(true);
+    setFaqIsGlobal(true);
     setEditingFaq(null);
     setFaqFormError(null);
   };
@@ -174,6 +176,7 @@ export function FaqManagement() {
     setFaqCategoryId(faq.categoryId || '');
     setFaqOrderIndex(faq.orderIndex || 0);
     setFaqIsActive(faq.isActive);
+    setFaqIsGlobal(faq.isGlobal !== false);
     setFaqFormError(null);
     setIsFaqModalOpen(true);
   };
@@ -195,6 +198,7 @@ export function FaqManagement() {
       categoryId: faqCategoryId || null,
       orderIndex: Number(faqOrderIndex),
       isActive: faqIsActive,
+      isGlobal: faqIsGlobal,
     };
 
     if (editingFaq) {
@@ -467,6 +471,15 @@ export function FaqManagement() {
                         <Badge variant="outline" className="text-[10px] font-semibold bg-muted/20">
                           {itemCategoryName}
                         </Badge>
+                        {faq.isGlobal === false ? (
+                          <Badge variant="outline" className="text-[10px] font-semibold text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30">
+                            Product Only
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-[10px] font-semibold text-sky-600 dark:text-sky-400 border-sky-300 dark:border-sky-800 bg-sky-50 dark:bg-sky-950/30">
+                            Global
+                          </Badge>
+                        )}
                         {!faq.isActive && (
                           <Badge variant="secondary" className="text-[10px] font-semibold text-muted-foreground bg-muted">
                             Inactive / Draft
@@ -662,6 +675,37 @@ export function FaqManagement() {
                     <span
                       className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
                         faqIsActive ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {/* Global Storefront FAQ vs Product Only toggle */}
+                <div className="flex items-center justify-between border bg-muted/20 p-3.5 rounded-lg">
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold block">Global Storefront FAQ</span>
+                      <Badge variant={faqIsGlobal ? 'default' : 'secondary'} className="text-[10px] h-4 px-1.5 font-medium">
+                        {faqIsGlobal ? 'Global' : 'Product Only'}
+                      </Badge>
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      {faqIsGlobal
+                        ? 'Visible on the main Storefront /faq page (can also be assigned to products).'
+                        : 'Product-only FAQ. Hidden from /faq page; only visible on assigned products.'}
+                    </span>
+                  </div>
+                  <button
+                    id="faq-form-global-toggle"
+                    type="button"
+                    onClick={() => setFaqIsGlobal(!faqIsGlobal)}
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      faqIsGlobal ? 'bg-primary' : 'bg-muted-foreground/30'
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        faqIsGlobal ? 'translate-x-5' : 'translate-x-0'
                       }`}
                     />
                   </button>

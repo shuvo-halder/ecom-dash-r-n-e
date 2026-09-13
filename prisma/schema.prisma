@@ -889,6 +889,7 @@ model FAQ {
   category   FAQCategory? @relation(fields: [categoryId], references: [id])
   orderIndex Int          @default(0)
   isActive   Boolean      @default(true)
+  isGlobal   Boolean      @default(true)
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
   deletedAt   DateTime?

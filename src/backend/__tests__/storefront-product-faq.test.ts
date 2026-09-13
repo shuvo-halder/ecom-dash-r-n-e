@@ -297,6 +297,7 @@ test("STEP 2C — Storefront Product API: Nested Product FAQs Suite", async (t) 
       return mockFaqs.filter((f) => {
         if (where?.deletedAt === null && f.deletedAt !== null) return false;
         if (where?.isActive === true && f.isActive !== true) return false;
+        if (where?.isGlobal !== undefined && (f.isGlobal ?? true) !== where.isGlobal) return false;
         return true;
       });
     };

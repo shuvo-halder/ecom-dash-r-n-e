@@ -66,10 +66,11 @@ export class StorefrontContentService {
   }
 
   async getFaqs() {
-    return prisma.fAQ.findMany({
+    const faqs = await prisma.fAQ.findMany({
       where: {
         isActive: true,
         deletedAt: null,
+        isGlobal: true,
       },
       include: {
         category: true,
@@ -78,6 +79,7 @@ export class StorefrontContentService {
         orderIndex: "asc",
       },
     });
+    return faqs.map(({ isGlobal, ...faq }: any) => faq);
   }
 
   async getLandingPageBySlug(slug: string) {

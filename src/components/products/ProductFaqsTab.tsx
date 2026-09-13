@@ -418,6 +418,15 @@ export function ProductFaqsTab({ productId }: ProductFaqsTabProps) {
                                 {faq.category.name}
                               </Badge>
                             )}
+                            {faq.isGlobal === false ? (
+                              <Badge variant="outline" className="text-[10px] py-0 px-1.5 font-normal text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30">
+                                Product Only
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-[10px] py-0 px-1.5 font-normal text-sky-600 dark:text-sky-400 border-sky-300 dark:border-sky-800 bg-sky-50 dark:bg-sky-950/30">
+                                Global
+                              </Badge>
+                            )}
                           </div>
                           {plainAnswer && (
                             <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">

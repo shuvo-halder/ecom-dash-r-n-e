@@ -263,6 +263,7 @@ export const createFAQSchema = z.object({
   categoryId: z.string().uuid("Invalid category ID").optional().nullable(),
   orderIndex: z.number().int().optional().default(0),
   isActive: z.boolean().optional().default(true),
+  isGlobal: z.boolean().optional().default(true),
 });
 
 export const updateFAQSchema = createFAQSchema.partial();
