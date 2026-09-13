@@ -142,8 +142,7 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
         icon: UserCog,
         items: [
           { label: 'Users', href: '/admin/users', module: 'Users', requiredPermission: 'Users.read', icon: Users },
-          { label: 'Roles', href: '/admin/roles', module: 'Roles', requiredPermission: 'Roles.read', icon: Key },
-          { label: 'Permissions', href: '/admin/roles', module: 'Roles', requiredPermission: 'Roles.read', icon: ShieldCheck }
+          { label: 'Roles & Permissions', href: '/admin/roles', module: 'Roles', requiredPermission: 'Roles.read', icon: Key }
         ]
       }
     },
@@ -155,7 +154,7 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
         icon: Users,
         items: [
           { label: 'Customers', href: '/customers', module: 'Customers', requiredPermission: 'Customers.read', icon: Users },
-          { label: 'Customer Activity', href: '/admin/sessions', module: 'Sessions', requiredPermission: 'Sessions.read', icon: Activity }
+          { label: 'Active Sessions', href: '/admin/sessions', module: 'Sessions', requiredPermission: 'Sessions.read', icon: Activity }
         ]
       }
     },
@@ -170,7 +169,6 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
           { label: 'Brands', href: '/brands', module: 'Brands', requiredPermission: 'Brands.read', icon: Tag },
           { label: 'Products', href: '/products', module: 'Products', requiredPermission: 'Products.read', icon: Package },
           { label: 'Reviews', href: '/admin/reviews', module: 'Products', requiredPermission: 'Products.read', icon: Star },
-          { label: 'Variants', href: '/products', module: 'Products', requiredPermission: 'Products.read', icon: Layers },
           { label: 'Inventory', href: '/inventory', module: 'Inventory', requiredPermission: 'Inventory.read', icon: Boxes }
         ]
       }
@@ -212,10 +210,10 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
         title: 'Content Management',
         icon: FileText,
         items: [
-          { label: 'CMS Pages', href: '/admin/cms', module: 'CMS', requiredPermission: 'CMS.read', icon: FileText },
-          { label: 'Blog', href: '/admin/blog', module: 'Blog', requiredPermission: 'Blog.read', icon: PenTool },
-          { label: 'FAQ', href: '/admin/faqs', module: 'FAQ', requiredPermission: 'FAQ.read', icon: HelpCircle },
-          { label: 'Media Library', href: '/admin/media', module: 'Media', requiredPermission: 'Media.read', icon: Image },
+          { label: 'Pages', href: '/admin/cms', module: 'CMS', requiredPermission: 'CMS.read', icon: FileText },
+          { label: 'Blog Posts', href: '/admin/blog', module: 'Blog', requiredPermission: 'Blog.read', icon: PenTool },
+          { label: 'FAQs', href: '/admin/faqs', module: 'FAQ', requiredPermission: 'FAQ.read', icon: HelpCircle },
+          { label: 'Media', href: '/admin/media', module: 'Media', requiredPermission: 'Media.read', icon: Image },
           { label: 'Landing Pages', href: '/admin/landing-pages', module: 'LandingPages', requiredPermission: 'LandingPages.read', icon: LayoutTemplate }
         ]
       }
@@ -242,8 +240,7 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
           { label: 'Notifications', href: '/admin/notifications', module: 'Notifications', requiredPermission: 'Notifications.read', icon: Bell },
           { label: 'Archive', href: '/admin/archive', module: 'Settings', requiredPermission: 'Settings.read', icon: Archive },
           { label: 'Settings', href: '/settings', module: 'Settings', requiredPermission: 'Settings.read', icon: Settings },
-          { label: 'SEO Settings', href: '/admin/seo', module: 'SEO', requiredPermission: 'SEO.read', icon: Search },
-          { label: 'Security & Auth', href: '/settings', module: 'Settings', requiredPermission: 'Settings.read', icon: Shield }
+          { label: 'SEO', href: '/admin/seo', module: 'SEO', requiredPermission: 'SEO.read', icon: Search }
         ]
       }
     }
