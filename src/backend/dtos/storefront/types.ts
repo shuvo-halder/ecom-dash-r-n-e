@@ -51,6 +51,13 @@ export interface StorefrontVariant {
   image: string | null;
 }
 
+export interface StorefrontProductFaq {
+  id: string;
+  question: string;
+  answer: string;
+  sortOrder: number;
+}
+
 export interface StorefrontProduct {
   id: string;
   name: string;
@@ -87,6 +94,8 @@ export interface StorefrontProduct {
   
   rating?: number;
   reviewCount?: number;
+
+  faqs?: StorefrontProductFaq[];
 }
 
 export interface PaginatedResponse<T> {

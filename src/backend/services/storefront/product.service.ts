@@ -220,7 +220,22 @@ export class StorefrontProductService {
               }
             }
           }
-        }
+        },
+        productFaqs: {
+          where: {
+            faq: {
+              isActive: true,
+              deletedAt: null,
+            },
+          },
+          orderBy: [
+            { sortOrder: 'asc' },
+            { createdAt: 'asc' },
+          ],
+          include: {
+            faq: true,
+          },
+        },
       }
     });
 

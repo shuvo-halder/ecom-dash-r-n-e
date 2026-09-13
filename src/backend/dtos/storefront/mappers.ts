@@ -1,4 +1,4 @@
-import { StorefrontProduct, StorefrontCategory, StorefrontBrand, StorefrontProductImage, StorefrontVariant } from "./types";
+import { StorefrontProduct, StorefrontCategory, StorefrontBrand, StorefrontProductImage, StorefrontVariant, StorefrontProductFaq } from "./types";
 
 export function mapCategoryToStorefrontDTO(category: any): StorefrontCategory & { children?: any[] } {
   const result: any = {
@@ -91,6 +91,25 @@ export function mapProductToStorefrontDTO(product: any): StorefrontProduct {
     ? rootStock > 0
     : (variants.length > 0 ? variants.some(v => v.inStock) : false);
 
+  let faqs: StorefrontProductFaq[] | undefined = undefined;
+  if (product.productFaqs) {
+    const validProductFaqs = [...product.productFaqs]
+      .filter((pf: any) => pf.faq && pf.faq.isActive === true && pf.faq.deletedAt === null)
+      .sort((a: any, b: any) => {
+        if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
+        const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return timeA - timeB;
+      });
+
+    faqs = validProductFaqs.map((pf: any): StorefrontProductFaq => ({
+      id: pf.faq.id,
+      question: pf.faq.question,
+      answer: pf.faq.answer,
+      sortOrder: pf.sortOrder,
+    }));
+  }
+
   return {
     id: product.id,
     name: product.name,
@@ -100,7 +119,7 @@ export function mapProductToStorefrontDTO(product: any): StorefrontProduct {
     price: product.price ? Number(product.price) : null,
     seoTitle: product.metaTitle || product.name,
     seoDescription: product.metaDescription || product.shortDescription || null,
-    ogImage: primaryImageUrl,
+    ogImage: product.ogImage || primaryImageUrl,
     gtin: product.gtin,
     mpn: product.mpn,
     condition: product.condition,
@@ -114,6 +133,7 @@ export function mapProductToStorefrontDTO(product: any): StorefrontProduct {
     primaryImage: primaryImageObj || primaryImageUrl,
     stock: rootStock,
     inStock: rootInStock,
+    ...(faqs !== undefined ? { faqs } : {}),
   };
 }
 

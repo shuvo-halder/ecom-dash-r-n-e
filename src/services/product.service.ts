@@ -102,3 +102,54 @@ export const setPrimaryProductImage = async (productId: string, imageId: string)
   const { data } = await api.put(`/products/${productId}/images/${imageId}/primary`);
   return data.data;
 };
+
+// ==========================================
+// Product FAQ Management Services (STEP 2D)
+// ==========================================
+
+export interface ProductFaqItem {
+  id: string;
+  question: string;
+  answer: string;
+  category: {
+    id: string;
+    name: string;
+  } | null;
+  sortOrder: number;
+  isActive: boolean;
+}
+
+export interface ProductFaqsResponse {
+  productId: string;
+  faqs: ProductFaqItem[];
+}
+
+export const getProductFaqs = async (productId: string): Promise<ProductFaqItem[]> => {
+  const { data } = await api.get(`/products/${productId}/faqs`);
+  return data.data?.faqs || data.faqs || [];
+};
+
+export const assignProductFaq = async (
+  productId: string,
+  faqId: string,
+  sortOrder?: number
+): Promise<any> => {
+  const { data } = await api.post(`/products/${productId}/faqs`, { faqId, sortOrder });
+  return data.data || data;
+};
+
+export const reorderProductFaqs = async (
+  productId: string,
+  faqIds: string[]
+): Promise<any> => {
+  const { data } = await api.put(`/products/${productId}/faqs/reorder`, { faqIds });
+  return data.data || data;
+};
+
+export const unlinkProductFaq = async (
+  productId: string,
+  faqId: string
+): Promise<any> => {
+  const { data } = await api.delete(`/products/${productId}/faqs/${faqId}`);
+  return data.data || data;
+};

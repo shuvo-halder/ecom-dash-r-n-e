@@ -127,3 +127,117 @@ test("Brand SEO Fallback", () => {
   assert.strictEqual(dto2.seoTitle, "SEO Brand Title"); 
   assert.strictEqual(dto2.seoDescription, "SEO Brand Desc");
 });
+
+test("Product DTO - Nested FAQs mapping and field sanitization", () => {
+  // 1. List query / no productFaqs included
+  const listProduct = {
+    id: "prod-1",
+    name: "List Product",
+    slug: "list-product",
+  };
+  const listDto = mapProductToStorefrontDTO(listProduct);
+  assert.strictEqual(listDto.faqs, undefined);
+
+  // 2. Empty productFaqs returns empty array []
+  const emptyFaqsProduct = {
+    id: "prod-2",
+    name: "Empty FAQs Product",
+    slug: "empty-faqs-product",
+    productFaqs: [],
+  };
+  const emptyFaqsDto = mapProductToStorefrontDTO(emptyFaqsProduct);
+  assert.deepStrictEqual(emptyFaqsDto.faqs, []);
+
+  // 3. Product with valid, inactive, and deleted FAQs
+  const productWithFaqs = {
+    id: "prod-3",
+    name: "Product with FAQs",
+    slug: "product-with-faqs",
+    productFaqs: [
+      {
+        id: "pf-2",
+        productId: "prod-3",
+        faqId: "faq-2",
+        sortOrder: 10,
+        createdAt: new Date("2026-01-02"),
+        updatedAt: new Date("2026-01-02"),
+        faq: {
+          id: "faq-2",
+          question: "Second Question?",
+          answer: "Second Answer.",
+          isActive: true,
+          deletedAt: null,
+          createdAt: new Date("2026-01-01"),
+          updatedAt: new Date("2026-01-01"),
+        }
+      },
+      {
+        id: "pf-1",
+        productId: "prod-3",
+        faqId: "faq-1",
+        sortOrder: 0,
+        createdAt: new Date("2026-01-01"),
+        updatedAt: new Date("2026-01-01"),
+        faq: {
+          id: "faq-1",
+          question: "First Question?",
+          answer: "First Answer.",
+          isActive: true,
+          deletedAt: null,
+          createdAt: new Date("2026-01-01"),
+          updatedAt: new Date("2026-01-01"),
+        }
+      },
+      {
+        id: "pf-3",
+        productId: "prod-3",
+        faqId: "faq-3",
+        sortOrder: 5,
+        faq: {
+          id: "faq-3",
+          question: "Inactive Question?",
+          answer: "Inactive Answer.",
+          isActive: false,
+          deletedAt: null,
+        }
+      },
+      {
+        id: "pf-4",
+        productId: "prod-3",
+        faqId: "faq-4",
+        sortOrder: 6,
+        faq: {
+          id: "faq-4",
+          question: "Deleted Question?",
+          answer: "Deleted Answer.",
+          isActive: true,
+          deletedAt: new Date("2026-01-05"),
+        }
+      }
+    ],
+  };
+
+  const dto = mapProductToStorefrontDTO(productWithFaqs);
+  assert.ok(Array.isArray(dto.faqs));
+  assert.strictEqual(dto.faqs?.length, 2);
+
+  // Verify sort order
+  assert.strictEqual(dto.faqs[0].id, "faq-1");
+  assert.strictEqual(dto.faqs[0].question, "First Question?");
+  assert.strictEqual(dto.faqs[0].answer, "First Answer.");
+  assert.strictEqual(dto.faqs[0].sortOrder, 0);
+
+  assert.strictEqual(dto.faqs[1].id, "faq-2");
+  assert.strictEqual(dto.faqs[1].question, "Second Question?");
+  assert.strictEqual(dto.faqs[1].answer, "Second Answer.");
+  assert.strictEqual(dto.faqs[1].sortOrder, 10);
+
+  // Verify internal fields are not exposed
+  assert.strictEqual((dto.faqs[0] as any).isActive, undefined);
+  assert.strictEqual((dto.faqs[0] as any).deletedAt, undefined);
+  assert.strictEqual((dto.faqs[0] as any).createdAt, undefined);
+  assert.strictEqual((dto.faqs[0] as any).updatedAt, undefined);
+  assert.strictEqual((dto.faqs[0] as any).productId, undefined);
+  assert.strictEqual((dto.faqs[0] as any).faqId, undefined);
+});
+

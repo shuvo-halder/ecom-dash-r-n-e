@@ -6,8 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/src
 import { getCategories } from '../../services/category.service';
 import { getBrands } from '../../services/brand.service';
 import { ProductMediaTab } from '@/src/components/products/ProductMediaTab';
+import { ProductFaqsTab } from '@/src/components/products/ProductFaqsTab';
 import { ProductImageItem } from '../../services/product.service';
-import { ImageIcon, FileText, Tag, DollarSign, Settings } from 'lucide-react';
+import { ImageIcon, FileText, Tag, DollarSign, Settings, HelpCircle } from 'lucide-react';
 import { RichTextEditor } from '@/src/components/ui/RichTextEditor';
 
 interface ProductFormProps {
@@ -20,7 +21,7 @@ export function ProductForm({ initialData, onSubmit, isLoading }: ProductFormPro
   const { data: categories = [] } = useQuery<any[]>({ queryKey: ['categories'], queryFn: () => getCategories() });
   const { data: brands = [] } = useQuery<any[]>({ queryKey: ['brands'], queryFn: getBrands });
 
-  const [activeTab, setActiveTab] = useState<'basic' | 'media' | 'seo'>('basic');
+  const [activeTab, setActiveTab] = useState<'basic' | 'media' | 'seo' | 'faqs'>('basic');
 
   const initialImages: ProductImageItem[] = initialData?.images?.map((img: any) => ({
     id: img.id,
@@ -133,6 +134,20 @@ export function ProductForm({ initialData, onSubmit, isLoading }: ProductFormPro
         >
           <Settings className="h-4 w-4" />
           SEO & Organization
+        </button>
+
+        <button
+          type="button"
+          id="product-tab-faqs"
+          onClick={() => setActiveTab('faqs')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all ${
+            activeTab === 'faqs'
+              ? 'bg-background text-foreground shadow-sm ring-1 ring-primary/20'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <HelpCircle className="h-4 w-4 text-primary" />
+          Product FAQs
         </button>
       </div>
 
@@ -411,6 +426,11 @@ export function ProductForm({ initialData, onSubmit, isLoading }: ProductFormPro
             </Card>
           </div>
         </div>
+      )}
+
+      {/* Tab 4: Product FAQs */}
+      {activeTab === 'faqs' && (
+        <ProductFaqsTab productId={initialData?.id} />
       )}
 
       {/* Form Action Buttons */}
