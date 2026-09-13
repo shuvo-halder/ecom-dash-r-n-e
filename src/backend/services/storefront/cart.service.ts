@@ -427,10 +427,19 @@ export class StorefrontCartService {
     if (cartItem.product.trackInventory) {
       let availableStock = 0;
       if (cartItem.variant) {
-        const totalStock = (cartItem.variant.inventories || []).reduce(
-          (sum, inv) => sum + (inv.quantityAvailable - inv.quantityReserved),
+        let totalStock = (cartItem.variant.inventories || []).reduce(
+          (sum: number, inv: any) => sum + (inv.quantityAvailable - inv.quantityReserved),
           0
         );
+        if (
+          totalStock === 0 &&
+          (!cartItem.variant.inventories || cartItem.variant.inventories.length === 0) &&
+          cartItem.product.inventory
+        ) {
+          totalStock =
+            cartItem.product.inventory.quantityAvailable -
+            cartItem.product.inventory.quantityReserved;
+        }
         availableStock = Math.max(0, totalStock);
       } else if (cartItem.product.inventory) {
         availableStock = Math.max(
