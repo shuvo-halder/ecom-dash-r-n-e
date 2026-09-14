@@ -431,6 +431,7 @@ export class StorefrontCheckoutService {
     }
 
     // Perform complete checkout execution within a strict database transaction
+    const lowStockAlerts: any[] = [];
     const order = await prisma.$transaction(async (tx) => {
       // 1. Fetch current cart and items from database inside transaction
       const cart = await tx.cart.findFirst({
@@ -523,6 +524,8 @@ export class StorefrontCheckoutService {
             }
 
             if (useFallback) {
+              const previousAvailable = product.inventory.quantityAvailable;
+              const threshold = product.inventory.lowStockThreshold;
               const updated = await tx.inventory.updateMany({
                 where: {
                   id: product.inventory.id,
@@ -535,6 +538,9 @@ export class StorefrontCheckoutService {
               if (updated.count === 0) {
                 throw new AppError(`Insufficient stock for "${product.name}" during checkout.`, 409, "INSUFFICIENT_STOCK");
               }
+              if (previousAvailable >= threshold && (previousAvailable - item.quantity) < threshold) {
+                lowStockAlerts.push({ product, variant, currentStock: previousAvailable - item.quantity, threshold });
+              }
               itemWarehouseMap.set(item.id, product.inventory.warehouseId || null);
             } else {
               const targetInventory = variant.inventories.find(
@@ -542,6 +548,8 @@ export class StorefrontCheckoutService {
               ) || variant.inventories[0];
 
               if (targetInventory) {
+                const previousAvailable = targetInventory.quantityAvailable;
+                const threshold = targetInventory.lowStockThreshold;
                 const updated = await tx.inventory.updateMany({
                   where: {
                     id: targetInventory.id,
@@ -553,6 +561,9 @@ export class StorefrontCheckoutService {
                 });
                 if (updated.count === 0) {
                   throw new AppError(`Insufficient stock for "${product.name}" during checkout.`, 409, "INSUFFICIENT_STOCK");
+                }
+                if (previousAvailable >= threshold && (previousAvailable - item.quantity) < threshold) {
+                  lowStockAlerts.push({ product, variant, currentStock: previousAvailable - item.quantity, threshold });
                 }
                 itemWarehouseMap.set(item.id, targetInventory.warehouseId || null);
               }
@@ -568,6 +579,8 @@ export class StorefrontCheckoutService {
               throw new AppError(`Insufficient stock for "${product.name}". Available: ${availableStock}, Requested: ${item.quantity}`, 409, "INSUFFICIENT_STOCK");
             }
 
+            const previousAvailable = product.inventory.quantityAvailable;
+            const threshold = product.inventory.lowStockThreshold;
             const updated = await tx.inventory.updateMany({
               where: {
                 id: product.inventory.id,
@@ -579,6 +592,9 @@ export class StorefrontCheckoutService {
             });
             if (updated.count === 0) {
               throw new AppError(`Insufficient stock for "${product.name}" during checkout.`, 409, "INSUFFICIENT_STOCK");
+            }
+            if (previousAvailable >= threshold && (previousAvailable - item.quantity) < threshold) {
+              lowStockAlerts.push({ product, variant: null, currentStock: previousAvailable - item.quantity, threshold });
             }
             itemWarehouseMap.set(item.id, product.inventory.warehouseId || null);
           }
@@ -817,6 +833,7 @@ export class StorefrontCheckoutService {
             emailService.sendOrderConfirmationEmail(customer, fullOrder).catch((err) => {
               console.error(`[Email Service] Failed to send order confirmation to ${customer.email}`);
             });
+            emailService.sendAdminOrderNotificationEmail(fullOrder).catch(() => {});
           }
         }
       } else if (order.customerEmail) {
@@ -830,8 +847,12 @@ export class StorefrontCheckoutService {
               emailService.sendOrderConfirmationEmail(guestCustomer, fullOrder).catch((err) => {
                 console.error(`[Email Service] Failed to send order confirmation to guest email ${guestCustomer.email}`);
               });
+              emailService.sendAdminOrderNotificationEmail(fullOrder).catch(() => {});
             }
          } catch(e) { }
+      }
+          for (const alert of lowStockAlerts) {
+        emailService.sendAdminLowStockEmail(alert.product, alert.variant, alert.currentStock, alert.threshold).catch(() => {});
       }
     } catch (err) {
       console.error(`[Email Service] Error in confirmation email block:`, err);

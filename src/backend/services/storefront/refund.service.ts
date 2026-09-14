@@ -133,6 +133,7 @@ export class StorefrontRefundService {
           firstName: fullOrder.customer?.firstName || "Customer",
         };
         emailService.sendRefundRequestedEmail(emailRecipient, refundTransaction, fullOrder).catch(() => {});
+        emailService.sendAdminRefundEmail(refundTransaction, fullOrder, "Requested").catch(() => {});
       }
     } catch (e) {}
 

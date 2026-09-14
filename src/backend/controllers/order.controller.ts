@@ -167,6 +167,7 @@ export const updateOrderStatus = async (req: AuthRequest, res: Response, next: N
       return next(new AppError("Order not found", 404, "NOT_FOUND"));
     }
 
+
     const updateData: any = {};
     const timelineEntries: any[] = [];
     const actorName = req.user?.email || "Admin";
@@ -606,6 +607,11 @@ export const assignOrderStaff = async (req: AuthRequest, res: Response, next: Ne
         assignedStaff: { select: { id: true, firstName: true, lastName: true, email: true } },
       },
     });
+
+    if (updatedOrder.assignedStaff) {
+      
+      emailService.sendStaffAssignmentEmail(updatedOrder.assignedStaff, updatedOrder).catch(() => {});
+    }
 
     res.status(200).json({
       status: "success",

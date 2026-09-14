@@ -200,6 +200,7 @@ export class AdminRefundService {
             firstName: fullOrder.customer?.firstName || "Customer",
           };
           emailService.sendRefundRejectedEmail(emailRecipient, rejectedTransaction, fullOrder).catch(() => {});
+          emailService.sendAdminRefundEmail(rejectedTransaction, fullOrder, "Rejected").catch(() => {});
         }
       } catch (e) {}
 
@@ -332,6 +333,7 @@ export class AdminRefundService {
           firstName: fullOrder.customer?.firstName || "Customer",
         };
         emailService.sendRefundCompletedEmail(emailRecipient, completedTransaction, fullOrder).catch(() => {});
+        emailService.sendAdminRefundEmail(completedTransaction, fullOrder, "Completed").catch(() => {});
       }
     } catch (e) {}
 
@@ -477,6 +479,7 @@ export class AdminRefundService {
           firstName: fullOrder.customer?.firstName || "Customer",
         };
         emailService.sendRefundCompletedEmail(emailRecipient, completedRefund, fullOrder).catch(() => {});
+        emailService.sendAdminRefundEmail(completedRefund, fullOrder, "Completed").catch(() => {});
       }
     } catch (e) {}
 

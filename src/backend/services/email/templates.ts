@@ -364,3 +364,118 @@ export const getRefundRejectedHtml = (displayName, refund, order) => getBaseTemp
     <p style="margin-top: 24px;">If you have any questions, please contact our support team.</p>
   `
 );
+
+export const getAdminOrderNotificationHtml = (order: any, customerInfo: any, adminUrl: string) => getBaseTemplate(
+  "New Order Received",
+  `
+    <h2 style="color: #18181b; margin-top: 0;">New Order: #${order.orderNumber}</h2>
+    <p>A new order has been placed by <strong>${customerInfo.name}</strong> (${customerInfo.email}).</p>
+    
+    <div style="background-color: #f4f4f5; padding: 16px; border-radius: 6px; margin: 24px 0;">
+      <h3 style="margin-top: 0; font-size: 16px; color: #18181b;">Order Summary</h3>
+      <p style="margin: 0;"><strong>Total:</strong> ৳${order.total}</p>
+      <p style="margin: 8px 0 0 0;"><strong>Payment Status:</strong> ${order.paymentStatus}</p>
+      <p style="margin: 8px 0 0 0;"><strong>Order Status:</strong> ${order.status}</p>
+      <p style="margin: 8px 0 0 0;"><strong>Items:</strong> ${order.items?.length || 0}</p>
+    </div>
+
+    <div class="button-container">
+      <a href="${adminUrl}/orders/${order.id}" class="button">View Order in Admin</a>
+    </div>
+  `
+);
+
+export const getAdminPaymentFailedHtml = (order: any, payment: any, customerInfo: any, adminUrl: string) => getBaseTemplate(
+  "Payment Failed Alert",
+  `
+    <h2 style="color: #ef4444; margin-top: 0;">Payment Failed: #${order.orderNumber}</h2>
+    <p>A payment attempt failed for Order #${order.orderNumber}.</p>
+    
+    <div style="background-color: #fef2f2; padding: 16px; border-radius: 6px; margin: 24px 0; border: 1px solid #fee2e2;">
+      <h3 style="margin-top: 0; font-size: 16px; color: #991b1b;">Failure Details</h3>
+      <p style="margin: 0; color: #7f1d1d;"><strong>Customer:</strong> ${customerInfo.name} (${customerInfo.email})</p>
+      <p style="margin: 8px 0 0 0; color: #7f1d1d;"><strong>Amount:</strong> ৳${payment.amount}</p>
+      <p style="margin: 8px 0 0 0; color: #7f1d1d;"><strong>Method:</strong> ${payment.paymentMethod || 'Unknown'}</p>
+      <p style="margin: 8px 0 0 0; color: #7f1d1d;"><strong>Time:</strong> ${new Date().toLocaleString()}</p>
+    </div>
+
+    <div class="button-container">
+      <a href="${adminUrl}/orders/${order.id}" class="button">View Order in Admin</a>
+    </div>
+  `
+);
+
+export const getAdminLowStockHtml = (product: any, variant: any, currentStock: number, threshold: number, adminUrl: string) => getBaseTemplate(
+  "Low Stock Alert",
+  `
+    <h2 style="color: #f59e0b; margin-top: 0;">Low Stock Alert: ${product.name}</h2>
+    <p>An item has reached or fallen below its low stock threshold.</p>
+    
+    <div style="background-color: #fffbeb; padding: 16px; border-radius: 6px; margin: 24px 0; border: 1px solid #fef3c7;">
+      <h3 style="margin-top: 0; font-size: 16px; color: #92400e;">Inventory Details</h3>
+      <p style="margin: 0; color: #92400e;"><strong>Product:</strong> ${product.name}</p>
+      ${variant ? `<p style="margin: 8px 0 0 0; color: #92400e;"><strong>Variant:</strong> ${variant.sku}</p>` : ''}
+      <p style="margin: 8px 0 0 0; color: #92400e;"><strong>Current Stock:</strong> ${currentStock}</p>
+      <p style="margin: 8px 0 0 0; color: #92400e;"><strong>Threshold:</strong> ${threshold}</p>
+    </div>
+
+    <div class="button-container">
+      <a href="${adminUrl}/products/${product.id}" class="button">View Product</a>
+    </div>
+  `
+);
+
+export const getAdminReturnRequestedHtml = (returnReq: any, order: any, customerInfo: any, adminUrl: string) => getBaseTemplate(
+  "New Return Request",
+  `
+    <h2 style="color: #18181b; margin-top: 0;">Return Requested: #${order.orderNumber}</h2>
+    <p><strong>${customerInfo.name}</strong> (${customerInfo.email}) has requested a return.</p>
+    
+    <div style="background-color: #f4f4f5; padding: 16px; border-radius: 6px; margin: 24px 0;">
+      <h3 style="margin-top: 0; font-size: 16px; color: #18181b;">Return Details</h3>
+      <p style="margin: 0;"><strong>Return ID:</strong> ${returnReq.id}</p>
+      <p style="margin: 8px 0 0 0;"><strong>Reason:</strong> ${returnReq.reason || 'Not provided'}</p>
+      <p style="margin: 8px 0 0 0;"><strong>Status:</strong> ${returnReq.status}</p>
+    </div>
+
+    <div class="button-container">
+      <a href="${adminUrl}/returns/${returnReq.id}" class="button">View Return Request</a>
+    </div>
+  `
+);
+
+export const getAdminRefundHtml = (refund: any, order: any, type: 'Requested' | 'Completed' | 'Rejected', adminUrl: string) => getBaseTemplate(
+  `Refund ${type}`,
+  `
+    <h2 style="color: #18181b; margin-top: 0;">Refund ${type}: #${order.orderNumber}</h2>
+    <p>A refund has been <strong>${type.toLowerCase()}</strong> for Order #${order.orderNumber}.</p>
+    
+    <div style="background-color: #f4f4f5; padding: 16px; border-radius: 6px; margin: 24px 0;">
+      <h3 style="margin-top: 0; font-size: 16px; color: #18181b;">Refund Details</h3>
+      <p style="margin: 0;"><strong>Amount:</strong> ৳${refund.amount}</p>
+      <p style="margin: 8px 0 0 0;"><strong>Status:</strong> ${refund.status}</p>
+    </div>
+
+    <div class="button-container">
+      <a href="${adminUrl}/orders/${order.id}" class="button">View Order</a>
+    </div>
+  `
+);
+
+export const getStaffAssignmentHtml = (staff: any, order: any, adminUrl: string) => getBaseTemplate(
+  "Order Assigned to You",
+  `
+    <h2 style="color: #18181b; margin-top: 0;">Hi ${staff.firstName},</h2>
+    <p>You have been assigned to process <strong>Order #${order.orderNumber}</strong>.</p>
+    
+    <div style="background-color: #f4f4f5; padding: 16px; border-radius: 6px; margin: 24px 0;">
+      <h3 style="margin-top: 0; font-size: 16px; color: #18181b;">Order Details</h3>
+      <p style="margin: 0;"><strong>Order Status:</strong> ${order.status}</p>
+      <p style="margin: 8px 0 0 0;"><strong>Payment Status:</strong> ${order.paymentStatus}</p>
+    </div>
+
+    <div class="button-container">
+      <a href="${adminUrl}/orders/${order.id}" class="button">View Order</a>
+    </div>
+  `
+);

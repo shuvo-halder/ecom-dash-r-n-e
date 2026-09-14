@@ -121,6 +121,7 @@ export class StorefrontReturnService {
           firstName: fullOrder.customer?.firstName || "Customer",
         };
         emailService.sendReturnRequestedEmail(emailRecipient, returnRequestTransaction, fullOrder).catch(() => {});
+        emailService.sendAdminReturnRequestedEmail(returnRequestTransaction, fullOrder).catch(() => {});
       }
     } catch (e) {}
 
