@@ -1,3 +1,4 @@
+import { api } from "../../../lib/api";
 import React, { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getSettings, updateSettings } from "../../../services/setting.service";
@@ -414,10 +415,11 @@ export function Settings() {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-6 pt-2">
-                      <label className="flex items-center gap-2 cursor-pointer text-sm font-medium">
-                        <input
-                          type="checkbox"
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pt-2">
+                      <div className="flex items-center gap-6">
+                        <label className="flex items-center gap-2 cursor-pointer text-sm font-medium">
+                          <input
+                            type="checkbox"
                           name="secure"
                           checked={formData.secure ?? true}
                           onChange={handleChange}
@@ -434,8 +436,30 @@ export function Settings() {
                           onChange={handleChange}
                           className="rounded border-input text-primary focus:ring-primary"
                         />
-                        Enable SMTP Email Delivery
-                      </label>
+                          Enable SMTP Email Delivery
+                        </label>
+                      </div>
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        size="sm"
+                        onClick={async () => {
+                          try {
+                            // First save current settings
+                            await api.put("/api/v1/settings/smtp", {
+                              ...formData,
+                              port: formData.port ? parseInt(formData.port, 10) : undefined
+                            });
+                            const res = await api.post("/api/v1/settings/smtp/test");
+                            notify.success(res.data.message || "Test email sent successfully");
+                          } catch (error: any) {
+                            notify.error(error.response?.data?.message || "Failed to test SMTP connection");
+                          }
+                        }}
+                      >
+                        <Mail className="w-4 h-4 mr-2" />
+                        Test Connection
+                      </Button>
                     </div>
                   </div>
                 )}

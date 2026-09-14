@@ -1,5 +1,6 @@
 import express from "express";
 import { 
+  testSMTP,
   getGeneral, updateGeneral,
   getStore, updateStore,
   getBranding, updateBranding,
@@ -38,6 +39,7 @@ router.put("/seo", requirePermission("Settings", "write"), validateBody(updateSE
 
 router.get("/smtp", requirePermission("Settings", "read"), getSMTP);
 router.put("/smtp", requirePermission("Settings", "write"), validateBody(updateSMTPSettingsSchema), updateSMTP);
+router.post("/smtp/test", requirePermission("Settings", "write"), testSMTP);
 
 router.get("/analytics", requirePermission("Settings", "read"), getAnalytics);
 router.put("/analytics", requirePermission("Settings", "write"), validateBody(updateAnalyticsSettingsSchema), updateAnalytics);

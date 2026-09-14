@@ -1,3 +1,6 @@
+import { getBaseTemplate } from "../services/email/templates";
+import { emailService } from "../services/email.service";
+import { SettingService as InternalSettingService } from "../services/setting.service";
 import { Response, NextFunction } from "express";
 import { SettingService } from "../services/setting.service";
 import { AuthRequest } from "../middlewares/auth";
@@ -125,5 +128,64 @@ export const updateStore = async (req: AuthRequest, res: Response, next: NextFun
   try {
     const result = await SettingService.updateStore(req.body, req.user!.id);
     res.status(200).json({ status: "success", data: result });
+  } catch (error) { next(error); }
+};
+
+export const testSMTP = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    
+    
+    // Check if SMTP is enabled
+    
+    const smtpSettings = await InternalSettingService.getSMTP();
+    
+    if (!smtpSettings || !smtpSettings.enabled) {
+      return res.status(400).json({
+        status: "error",
+        message: "SMTP is currently disabled. Please enable it before testing."
+      });
+    }
+
+    try {
+      // 1. Verify connection
+      await emailService.verify();
+      
+      // 2. Send test email to the authenticated admin
+      const recipient = req.user?.email;
+      if (!recipient) {
+         return res.status(400).json({
+           status: "error",
+           message: "Admin email address not found in authenticated session."
+         });
+      }
+      
+      
+      const storeName = await emailService.getStoreName();
+      
+      const mailOptions = {
+        to: recipient,
+        subject: "SMTP Test Verification",
+        html: getBaseTemplate(
+          "SMTP Test Email", 
+          "<p>If you are receiving this email, your SMTP configuration is successfully verified and working.</p>",
+          storeName
+        )
+      };
+      
+      await (emailService as any).send(mailOptions);
+      
+      return res.status(200).json({ 
+        status: "success", 
+        message: "SMTP connection verified and test email successfully sent to your admin email address." 
+      });
+
+    } catch (smtpError: any) {
+      console.log("TEST SMTP ERROR:", smtpError);
+      return res.status(400).json({
+        status: "error",
+        message: "SMTP connection failed. Please verify the SMTP host, port, security mode, username, and password."
+      });
+    }
+
   } catch (error) { next(error); }
 };

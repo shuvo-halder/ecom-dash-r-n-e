@@ -13,12 +13,8 @@ export class EmailService {
   };
 
   public resolveSecure(port: number, configuredSecure?: boolean | null): boolean {
-    if (port === 465) {
-      return configuredSecure !== false;
-    }
     if (port === 587) {
-      // Port 587 normally uses secure: false with STARTTLS handled by Nodemailer
-      return false;
+      return false; // Port 587 MUST always be false for STARTTLS in Nodemailer according to Test F
     }
     if (configuredSecure !== undefined && configuredSecure !== null) {
       return configuredSecure;
@@ -65,6 +61,18 @@ export class EmailService {
     });
   }
 
+  
+  public async verify(): Promise<boolean> {
+    try {
+      const realTransporter = await this.createRealTransporter();
+      await realTransporter.verify();
+      return true;
+    } catch (error: any) {
+      this.logError("SMTP Verification Failed", error);
+      throw error;
+    }
+  }
+
   private async getTransporter() {
     return this.transporter;
   }
@@ -81,6 +89,20 @@ export class EmailService {
     console.error(`[EMAIL] ${context}`, diagnostics);
   }
 
+  
+  public async getStoreName() {
+    let setting: any = null;
+    try {
+      setting = await prisma.brandingSetting.findFirst();
+    } catch {
+      // Fallback
+    }
+    if (setting && setting.storeName) {
+      return setting.storeName;
+    }
+    return process.env.STORE_NAME || 'Storefront';
+  }
+
   private async getFromAddress() {
     let setting: any = null;
     try {
@@ -88,11 +110,12 @@ export class EmailService {
     } catch {
       // Fallback
     }
+    const storeName = await this.getStoreName();
     if (setting && setting.enabled && setting.fromEmail) {
-      const name = setting.fromName || "Storefront";
+      const name = setting.fromName || storeName;
       return `"${name}" <${setting.fromEmail}>`;
     }
-    return process.env.SMTP_FROM || '"Storefront" <noreply@storefront.com>';
+    return process.env.SMTP_FROM || `"${storeName}" <noreply@storefront.com>`;
   }
 
   private async send(mailOptions: any) {
@@ -127,10 +150,11 @@ export class EmailService {
     const verificationUrl = `${this.getStorefrontUrl()}/verify-email?token=${encodeURIComponent(token)}`;
     const displayName = firstName || "Customer";
 
+    const storeName = await this.getStoreName();
     const mailOptions = {
       to: email,
       subject: "Verify Your Email Address",
-      html: getVerificationEmailHtml(displayName, verificationUrl),
+      html: getVerificationEmailHtml(displayName, verificationUrl, storeName),
     };
 
     try {
@@ -145,10 +169,11 @@ export class EmailService {
     const verificationUrl = `${this.getStorefrontUrl()}/verify-email-change?token=${encodeURIComponent(token)}`;
     const displayName = firstName || "Customer";
 
+    const storeName = await this.getStoreName();
     const mailOptions = {
       to: newEmail,
       subject: "Confirm Your New Email Address",
-      html: getEmailChangeHtml(displayName, verificationUrl),
+      html: getEmailChangeHtml(displayName, verificationUrl, storeName),
     };
 
     try {
@@ -163,10 +188,11 @@ export class EmailService {
     const resetUrl = `${this.getStorefrontUrl()}/reset-password?token=${encodeURIComponent(rawToken)}`;
     const displayName = firstName || "Customer";
 
+    const storeName = await this.getStoreName();
     const mailOptions = {
       to: email,
       subject: "Reset Your Password",
-      html: getPasswordResetHtml(displayName, resetUrl),
+      html: getPasswordResetHtml(displayName, resetUrl, storeName),
     };
 
     try {
@@ -181,10 +207,11 @@ export class EmailService {
     const resetUrl = `${this.getAdminUrl()}/reset-password?token=${encodeURIComponent(rawToken)}`;
     const displayName = firstName || "Admin";
 
+    const storeName = await this.getStoreName();
     const mailOptions = {
       to: email,
       subject: "Reset Your Password",
-      html: getPasswordResetHtml(displayName, resetUrl),
+      html: getPasswordResetHtml(displayName, resetUrl, storeName),
     };
 
     try {
@@ -197,10 +224,11 @@ export class EmailService {
   async sendOrderConfirmationEmail(customer: { email: string; firstName?: string | null; lastName?: string | null }, order: any) {
     if (!customer || !customer.email) return;
     const displayName = customer.firstName || "Customer";
+    const storeName = await this.getStoreName();
     const mailOptions = {
       to: customer.email,
       subject: `Order Confirmation #${order.orderNumber}`,
-      html: getOrderConfirmationHtml(displayName, order),
+      html: getOrderConfirmationHtml(displayName, order, storeName),
     };
     try {
       await this.send(mailOptions);
@@ -212,10 +240,11 @@ export class EmailService {
   async sendOrderProcessingEmail(customer: { email: string; firstName?: string | null; lastName?: string | null }, order: any) {
     if (!customer || !customer.email) return;
     const displayName = customer.firstName || "Customer";
+    const storeName = await this.getStoreName();
     const mailOptions = {
       to: customer.email,
       subject: `Your Order #${order.orderNumber} is Processing`,
-      html: getOrderProcessingHtml(displayName, order),
+      html: getOrderProcessingHtml(displayName, order, storeName),
     };
     try {
       await this.send(mailOptions);
@@ -227,10 +256,11 @@ export class EmailService {
   async sendOrderConfirmedEmail(customer: { email: string; firstName?: string | null; lastName?: string | null }, order: any) {
     if (!customer || !customer.email) return;
     const displayName = customer.firstName || "Customer";
+    const storeName = await this.getStoreName();
     const mailOptions = {
       to: customer.email,
       subject: `Your Order #${order.orderNumber} is Confirmed`,
-      html: getOrderConfirmedHtml(displayName, order),
+      html: getOrderConfirmedHtml(displayName, order, storeName),
     };
     try {
       await this.send(mailOptions);
@@ -242,10 +272,11 @@ export class EmailService {
   async sendOrderCancelledEmail(customer: { email: string; firstName?: string | null; lastName?: string | null }, order: any) {
     if (!customer || !customer.email) return;
     const displayName = customer.firstName || "Customer";
+    const storeName = await this.getStoreName();
     const mailOptions = {
       to: customer.email,
       subject: `Your Order #${order.orderNumber} is Cancelled`,
-      html: getOrderCancelledHtml(displayName, order),
+      html: getOrderCancelledHtml(displayName, order, storeName),
     };
     try {
       await this.send(mailOptions);
@@ -257,10 +288,11 @@ export class EmailService {
   async sendPaymentSuccessEmail(customer: { email: string; firstName?: string | null; lastName?: string | null }, payment: any, order: any) {
     if (!customer || !customer.email) return;
     const displayName = customer.firstName || "Customer";
+    const storeName = await this.getStoreName();
     const mailOptions = {
       to: customer.email,
       subject: `Payment Successful for Order #${order.orderNumber}`,
-      html: getPaymentSuccessHtml(displayName, payment, order),
+      html: getPaymentSuccessHtml(displayName, payment, order, storeName),
     };
     try {
       await this.send(mailOptions);
@@ -272,10 +304,11 @@ export class EmailService {
   async sendPaymentFailedEmail(customer: { email: string; firstName?: string | null; lastName?: string | null }, payment: any, order: any) {
     if (!customer || !customer.email) return;
     const displayName = customer.firstName || "Customer";
+    const storeName = await this.getStoreName();
     const mailOptions = {
       to: customer.email,
       subject: `Payment Failed for Order #${order.orderNumber}`,
-      html: getPaymentFailedHtml(displayName, payment, order),
+      html: getPaymentFailedHtml(displayName, payment, order, storeName),
     };
     try {
       await this.send(mailOptions);
@@ -287,10 +320,11 @@ export class EmailService {
   async sendOrderShippedEmail(customer: { email: string; firstName?: string | null; lastName?: string | null }, shipment: any, order: any) {
     if (!customer || !customer.email) return;
     const displayName = customer.firstName || "Customer";
+    const storeName = await this.getStoreName();
     const mailOptions = {
       to: customer.email,
       subject: `Your Order #${order.orderNumber} has Shipped`,
-      html: getOrderShippedHtml(displayName, shipment, order),
+      html: getOrderShippedHtml(displayName, shipment, order, storeName),
     };
     try {
       await this.send(mailOptions);
@@ -302,10 +336,11 @@ export class EmailService {
   async sendOrderDeliveredEmail(customer: { email: string; firstName?: string | null; lastName?: string | null }, shipment: any, order: any) {
     if (!customer || !customer.email) return;
     const displayName = customer.firstName || "Customer";
+    const storeName = await this.getStoreName();
     const mailOptions = {
       to: customer.email,
       subject: `Your Order #${order.orderNumber} has been Delivered`,
-      html: getOrderDeliveredHtml(displayName, shipment, order),
+      html: getOrderDeliveredHtml(displayName, shipment, order, storeName),
     };
     try {
       await this.send(mailOptions);
@@ -317,10 +352,11 @@ export class EmailService {
   async sendReturnRequestedEmail(customer: { email: string; firstName?: string | null; lastName?: string | null }, returnReq: any, order: any) {
     if (!customer || !customer.email) return;
     const displayName = customer.firstName || "Customer";
+    const storeName = await this.getStoreName();
     const mailOptions = {
       to: customer.email,
       subject: `Return Requested for Order #${order.orderNumber}`,
-      html: getReturnRequestedHtml(displayName, returnReq, order),
+      html: getReturnRequestedHtml(displayName, returnReq, order, storeName),
     };
     try {
       await this.send(mailOptions);
@@ -332,10 +368,11 @@ export class EmailService {
   async sendReturnApprovedEmail(customer: { email: string; firstName?: string | null; lastName?: string | null }, returnReq: any, order: any) {
     if (!customer || !customer.email) return;
     const displayName = customer.firstName || "Customer";
+    const storeName = await this.getStoreName();
     const mailOptions = {
       to: customer.email,
       subject: `Return Approved for Order #${order.orderNumber}`,
-      html: getReturnApprovedHtml(displayName, returnReq, order),
+      html: getReturnApprovedHtml(displayName, returnReq, order, storeName),
     };
     try {
       await this.send(mailOptions);
@@ -347,10 +384,11 @@ export class EmailService {
   async sendReturnRejectedEmail(customer: { email: string; firstName?: string | null; lastName?: string | null }, returnReq: any, order: any) {
     if (!customer || !customer.email) return;
     const displayName = customer.firstName || "Customer";
+    const storeName = await this.getStoreName();
     const mailOptions = {
       to: customer.email,
       subject: `Return Rejected for Order #${order.orderNumber}`,
-      html: getReturnRejectedHtml(displayName, returnReq, order),
+      html: getReturnRejectedHtml(displayName, returnReq, order, storeName),
     };
     try {
       await this.send(mailOptions);
@@ -362,10 +400,11 @@ export class EmailService {
   async sendReturnReceivedEmail(customer: { email: string; firstName?: string | null; lastName?: string | null }, returnReq: any, order: any) {
     if (!customer || !customer.email) return;
     const displayName = customer.firstName || "Customer";
+    const storeName = await this.getStoreName();
     const mailOptions = {
       to: customer.email,
       subject: `Return Received for Order #${order.orderNumber}`,
-      html: getReturnReceivedHtml(displayName, returnReq, order),
+      html: getReturnReceivedHtml(displayName, returnReq, order, storeName),
     };
     try {
       await this.send(mailOptions);
@@ -377,10 +416,11 @@ export class EmailService {
   async sendRefundRequestedEmail(customer: { email: string; firstName?: string | null; lastName?: string | null }, refund: any, order: any) {
     if (!customer || !customer.email) return;
     const displayName = customer.firstName || "Customer";
+    const storeName = await this.getStoreName();
     const mailOptions = {
       to: customer.email,
       subject: `Refund Requested for Order #${order.orderNumber}`,
-      html: getRefundRequestedHtml(displayName, refund, order),
+      html: getRefundRequestedHtml(displayName, refund, order, storeName),
     };
     try {
       await this.send(mailOptions);
@@ -392,10 +432,11 @@ export class EmailService {
   async sendRefundCompletedEmail(customer: { email: string; firstName?: string | null; lastName?: string | null }, refund: any, order: any) {
     if (!customer || !customer.email) return;
     const displayName = customer.firstName || "Customer";
+    const storeName = await this.getStoreName();
     const mailOptions = {
       to: customer.email,
       subject: `Refund Completed for Order #${order.orderNumber}`,
-      html: getRefundCompletedHtml(displayName, refund, order),
+      html: getRefundCompletedHtml(displayName, refund, order, storeName),
     };
     try {
       await this.send(mailOptions);
@@ -407,10 +448,11 @@ export class EmailService {
   async sendRefundRejectedEmail(customer: { email: string; firstName?: string | null; lastName?: string | null }, refund: any, order: any) {
     if (!customer || !customer.email) return;
     const displayName = customer.firstName || "Customer";
+    const storeName = await this.getStoreName();
     const mailOptions = {
       to: customer.email,
       subject: `Refund Rejected for Order #${order.orderNumber}`,
-      html: getRefundRejectedHtml(displayName, refund, order),
+      html: getRefundRejectedHtml(displayName, refund, order, storeName),
     };
     try {
       await this.send(mailOptions);
@@ -452,10 +494,11 @@ export class EmailService {
     }
     const adminUrl = process.env.ADMIN_URL || "http://localhost:3000";
 
+    const storeName = await this.getStoreName();
     const mailOptions = {
       to: recipients.join(','),
       subject: `New Order: #${order.orderNumber}`,
-      html: getAdminOrderNotificationHtml(order, customerInfo, adminUrl),
+      html: getAdminOrderNotificationHtml(order, customerInfo, adminUrl, storeName),
     };
 
     try {
@@ -477,10 +520,11 @@ export class EmailService {
     }
     const adminUrl = process.env.ADMIN_URL || "http://localhost:3000";
 
+    const storeName = await this.getStoreName();
     const mailOptions = {
       to: recipients.join(','),
       subject: `Payment Failed: #${order.orderNumber}`,
-      html: getAdminPaymentFailedHtml(order, payment, customerInfo, adminUrl),
+      html: getAdminPaymentFailedHtml(order, payment, customerInfo, adminUrl, storeName),
     };
 
     try {
@@ -496,10 +540,11 @@ export class EmailService {
     
     const adminUrl = process.env.ADMIN_URL || "http://localhost:3000";
 
+    const storeName = await this.getStoreName();
     const mailOptions = {
       to: recipients.join(','),
       subject: `Low Stock Alert: ${product.name}`,
-      html: getAdminLowStockHtml(product, variant, currentStock, threshold, adminUrl),
+      html: getAdminLowStockHtml(product, variant, currentStock, threshold, adminUrl, storeName),
     };
 
     try {
@@ -521,10 +566,11 @@ export class EmailService {
     }
     const adminUrl = process.env.ADMIN_URL || "http://localhost:3000";
 
+    const storeName = await this.getStoreName();
     const mailOptions = {
       to: recipients.join(','),
       subject: `Return Requested: #${order.orderNumber}`,
-      html: getAdminReturnRequestedHtml(returnReq, order, customerInfo, adminUrl),
+      html: getAdminReturnRequestedHtml(returnReq, order, customerInfo, adminUrl, storeName),
     };
 
     try {
@@ -540,10 +586,11 @@ export class EmailService {
     
     const adminUrl = process.env.ADMIN_URL || "http://localhost:3000";
 
+    const storeName = await this.getStoreName();
     const mailOptions = {
       to: recipients.join(','),
       subject: `Refund ${type}: #${order.orderNumber}`,
-      html: getAdminRefundHtml(refund, order, type, adminUrl),
+      html: getAdminRefundHtml(refund, order, type, adminUrl, storeName),
     };
 
     try {
@@ -558,10 +605,11 @@ export class EmailService {
     
     const adminUrl = process.env.ADMIN_URL || "http://localhost:3000";
 
+    const storeName = await this.getStoreName();
     const mailOptions = {
       to: staff.email,
       subject: `Order Assigned: #${order.orderNumber}`,
-      html: getStaffAssignmentHtml(staff, order, adminUrl),
+      html: getStaffAssignmentHtml(staff, order, adminUrl, storeName),
     };
 
     try {

@@ -1,4 +1,4 @@
-export const getBaseTemplate = (title: string, content: string) => `
+export const getBaseTemplate = (title: string, content: string, storeName: string = "Storefront") => `
 <!DOCTYPE html>
 <html>
 <head>
@@ -19,22 +19,21 @@ export const getBaseTemplate = (title: string, content: string) => `
 <body>
   <div class="container">
     <div class="header">
-      Storefront
+      ${storeName}
     </div>
     <div class="content">
       ${content}
     </div>
     <div class="footer">
-      &copy; ${new Date().getFullYear()} Storefront. All rights reserved.
+      &copy; ${new Date().getFullYear()} ${storeName}. All rights reserved.
     </div>
   </div>
 </body>
 </html>
 `;
 
-export const getVerificationEmailHtml = (displayName: string, verificationUrl: string) => getBaseTemplate(
-  "Verify Your Email Address",
-  `
+export const getVerificationEmailHtml = (displayName: string, verificationUrl: string, storeName?: string) => getBaseTemplate(
+  "Verify Your Email Address", `
     <h2>Welcome, ${displayName}!</h2>
     <p>Thank you for registering. Please verify your email address to complete your account setup.</p>
     <div class="button-container">
@@ -44,12 +43,12 @@ export const getVerificationEmailHtml = (displayName: string, verificationUrl: s
     <p><a href="${verificationUrl}">${verificationUrl}</a></p>
     <p>This verification link will expire in 24 hours.</p>
     <p class="muted">Security Notice: If you did not request this email, please ignore it. Never share your verification link.</p>
-  `
+  `,
+  storeName
 );
 
-export const getEmailChangeHtml = (displayName: string, verificationUrl: string) => getBaseTemplate(
-  "Confirm Your New Email Address",
-  `
+export const getEmailChangeHtml = (displayName: string, verificationUrl: string, storeName?: string) => getBaseTemplate(
+  "Confirm Your New Email Address", `
     <h2>Hello, ${displayName},</h2>
     <p>We received a request to change the email address associated with your account.</p>
     <div class="button-container">
@@ -59,12 +58,12 @@ export const getEmailChangeHtml = (displayName: string, verificationUrl: string)
     <p><a href="${verificationUrl}">${verificationUrl}</a></p>
     <p>This link will expire in 24 hours.</p>
     <p class="muted">Security Notice: If you did not request this change, please ignore this email and your address will remain unchanged. Do not share this link.</p>
-  `
+  `,
+  storeName
 );
 
-export const getPasswordResetHtml = (displayName: string, resetUrl: string) => getBaseTemplate(
-  "Reset Your Password",
-  `
+export const getPasswordResetHtml = (displayName: string, resetUrl: string, storeName?: string) => getBaseTemplate(
+  "Reset Your Password", `
     <h2>Hello, ${displayName},</h2>
     <p>We received a request to reset the password for your account.</p>
     <div class="button-container">
@@ -74,7 +73,8 @@ export const getPasswordResetHtml = (displayName: string, resetUrl: string) => g
     <p><a href="${resetUrl}">${resetUrl}</a></p>
     <p>This link will expire in 1 hour.</p>
     <p class="muted">Security Notice: If you did not request a password reset, please ignore this email. Your password will remain unchanged.</p>
-  `
+  `,
+  storeName
 );
 
 
@@ -162,8 +162,7 @@ export const getOrderDetailsHtml = (order) => `
 `;
 
 export const getOrderConfirmationHtml = (displayName, order) => getBaseTemplate(
-  "Order Confirmation",
-  `
+  "Order Confirmation", `
     <h2>Hi ${displayName},</h2>
     <p>Thank you for your order! We've received it and are getting it ready for you.</p>
     ${getOrderDetailsHtml(order)}
@@ -171,8 +170,7 @@ export const getOrderConfirmationHtml = (displayName, order) => getBaseTemplate(
 );
 
 export const getOrderProcessingHtml = (displayName, order) => getBaseTemplate(
-  "Your Order is Processing",
-  `
+  "Your Order is Processing", `
     <h2>Hi ${displayName},</h2>
     <p>Good news! We are currently processing your order.</p>
     ${getOrderDetailsHtml(order)}
@@ -180,8 +178,7 @@ export const getOrderProcessingHtml = (displayName, order) => getBaseTemplate(
 );
 
 export const getOrderConfirmedHtml = (displayName, order) => getBaseTemplate(
-  "Your Order is Confirmed",
-  `
+  "Your Order is Confirmed", `
     <h2>Hi ${displayName},</h2>
     <p>Your order has been confirmed and will be shipped soon.</p>
     ${getOrderDetailsHtml(order)}
@@ -189,8 +186,7 @@ export const getOrderConfirmedHtml = (displayName, order) => getBaseTemplate(
 );
 
 export const getOrderCancelledHtml = (displayName, order) => getBaseTemplate(
-  "Order Cancelled",
-  `
+  "Order Cancelled", `
     <h2>Hi ${displayName},</h2>
     <p>Your order has been cancelled. If you have already paid, a refund will be processed according to our policy.</p>
     ${getOrderDetailsHtml(order)}
@@ -199,8 +195,7 @@ export const getOrderCancelledHtml = (displayName, order) => getBaseTemplate(
 
 
 export const getPaymentSuccessHtml = (displayName, payment, order) => getBaseTemplate(
-  "Payment Successful",
-  `
+  "Payment Successful", `
     <h2>Hi ${displayName},</h2>
     <p>Your payment for Order #${order.orderNumber} was successful.</p>
     <div style="margin-top: 24px; border: 1px solid #e4e4e7; border-radius: 6px; padding: 16px;">
@@ -216,8 +211,7 @@ export const getPaymentSuccessHtml = (displayName, payment, order) => getBaseTem
 );
 
 export const getPaymentFailedHtml = (displayName, payment, order) => getBaseTemplate(
-  "Payment Failed",
-  `
+  "Payment Failed", `
     <h2>Hi ${displayName},</h2>
     <p>Unfortunately, your payment attempt for Order #${order.orderNumber} failed.</p>
     <div style="margin-top: 24px; border: 1px solid #fee2e2; background-color: #fef2f2; border-radius: 6px; padding: 16px;">
@@ -231,8 +225,7 @@ export const getPaymentFailedHtml = (displayName, payment, order) => getBaseTemp
 );
 
 export const getOrderShippedHtml = (displayName, shipment, order) => getBaseTemplate(
-  "Your Order has Shipped",
-  `
+  "Your Order has Shipped", `
     <h2>Hi ${displayName},</h2>
     <p>Great news! Your Order #${order.orderNumber} has been shipped.</p>
     <div style="margin-top: 24px; border: 1px solid #e4e4e7; border-radius: 6px; padding: 16px;">
@@ -249,8 +242,7 @@ export const getOrderShippedHtml = (displayName, shipment, order) => getBaseTemp
 );
 
 export const getOrderDeliveredHtml = (displayName, shipment, order) => getBaseTemplate(
-  "Your Order has been Delivered",
-  `
+  "Your Order has been Delivered", `
     <h2>Hi ${displayName},</h2>
     <p>Your Order #${order.orderNumber} has been successfully delivered.</p>
     <div style="margin-top: 24px; border: 1px solid #e4e4e7; border-radius: 6px; padding: 16px;">
@@ -265,8 +257,7 @@ export const getOrderDeliveredHtml = (displayName, shipment, order) => getBaseTe
 
 
 export const getReturnRequestedHtml = (displayName, returnReq, order) => getBaseTemplate(
-  "Return Requested",
-  `
+  "Return Requested", `
     <h2>Hi ${displayName},</h2>
     <p>We have received your return request for Order #${order.orderNumber}.</p>
     <div style="margin-top: 24px; border: 1px solid #e4e4e7; border-radius: 6px; padding: 16px;">
@@ -280,8 +271,7 @@ export const getReturnRequestedHtml = (displayName, returnReq, order) => getBase
 );
 
 export const getReturnApprovedHtml = (displayName, returnReq, order) => getBaseTemplate(
-  "Return Approved",
-  `
+  "Return Approved", `
     <h2>Hi ${displayName},</h2>
     <p>Your return request for Order #${order.orderNumber} has been approved.</p>
     <div style="margin-top: 24px; border: 1px solid #e4e4e7; border-radius: 6px; padding: 16px;">
@@ -294,8 +284,7 @@ export const getReturnApprovedHtml = (displayName, returnReq, order) => getBaseT
 );
 
 export const getReturnRejectedHtml = (displayName, returnReq, order) => getBaseTemplate(
-  "Return Rejected",
-  `
+  "Return Rejected", `
     <h2>Hi ${displayName},</h2>
     <p>We have reviewed your return request for Order #${order.orderNumber}, but unfortunately it has been rejected.</p>
     <div style="margin-top: 24px; border: 1px solid #fee2e2; background-color: #fef2f2; border-radius: 6px; padding: 16px;">
@@ -309,8 +298,7 @@ export const getReturnRejectedHtml = (displayName, returnReq, order) => getBaseT
 );
 
 export const getReturnReceivedHtml = (displayName, returnReq, order) => getBaseTemplate(
-  "Return Received",
-  `
+  "Return Received", `
     <h2>Hi ${displayName},</h2>
     <p>We have successfully received the returned item(s) for Order #${order.orderNumber}.</p>
     <div style="margin-top: 24px; border: 1px solid #e4e4e7; border-radius: 6px; padding: 16px;">
@@ -323,8 +311,7 @@ export const getReturnReceivedHtml = (displayName, returnReq, order) => getBaseT
 );
 
 export const getRefundRequestedHtml = (displayName, refund, order) => getBaseTemplate(
-  "Refund Requested",
-  `
+  "Refund Requested", `
     <h2>Hi ${displayName},</h2>
     <p>We have received your refund request for Order #${order.orderNumber}.</p>
     <div style="margin-top: 24px; border: 1px solid #e4e4e7; border-radius: 6px; padding: 16px;">
@@ -338,8 +325,7 @@ export const getRefundRequestedHtml = (displayName, refund, order) => getBaseTem
 );
 
 export const getRefundCompletedHtml = (displayName, refund, order) => getBaseTemplate(
-  "Refund Completed",
-  `
+  "Refund Completed", `
     <h2>Hi ${displayName},</h2>
     <p>Your refund for Order #${order.orderNumber} has been successfully processed.</p>
     <div style="margin-top: 24px; border: 1px solid #e4e4e7; border-radius: 6px; padding: 16px;">
@@ -352,8 +338,7 @@ export const getRefundCompletedHtml = (displayName, refund, order) => getBaseTem
 );
 
 export const getRefundRejectedHtml = (displayName, refund, order) => getBaseTemplate(
-  "Refund Rejected",
-  `
+  "Refund Rejected", `
     <h2>Hi ${displayName},</h2>
     <p>We have reviewed your refund request for Order #${order.orderNumber}, but unfortunately it has been rejected.</p>
     <div style="margin-top: 24px; border: 1px solid #fee2e2; background-color: #fef2f2; border-radius: 6px; padding: 16px;">
@@ -365,9 +350,8 @@ export const getRefundRejectedHtml = (displayName, refund, order) => getBaseTemp
   `
 );
 
-export const getAdminOrderNotificationHtml = (order: any, customerInfo: any, adminUrl: string) => getBaseTemplate(
-  "New Order Received",
-  `
+export const getAdminOrderNotificationHtml = (order: any, customerInfo: any, adminUrl: string, storeName?: string) => getBaseTemplate(
+  "New Order Received", `
     <h2 style="color: #18181b; margin-top: 0;">New Order: #${order.orderNumber}</h2>
     <p>A new order has been placed by <strong>${customerInfo.name}</strong> (${customerInfo.email}).</p>
     
@@ -382,12 +366,12 @@ export const getAdminOrderNotificationHtml = (order: any, customerInfo: any, adm
     <div class="button-container">
       <a href="${adminUrl}/orders/${order.id}" class="button">View Order in Admin</a>
     </div>
-  `
+  `,
+  storeName
 );
 
-export const getAdminPaymentFailedHtml = (order: any, payment: any, customerInfo: any, adminUrl: string) => getBaseTemplate(
-  "Payment Failed Alert",
-  `
+export const getAdminPaymentFailedHtml = (order: any, payment: any, customerInfo: any, adminUrl: string, storeName?: string) => getBaseTemplate(
+  "Payment Failed Alert", `
     <h2 style="color: #ef4444; margin-top: 0;">Payment Failed: #${order.orderNumber}</h2>
     <p>A payment attempt failed for Order #${order.orderNumber}.</p>
     
@@ -402,12 +386,12 @@ export const getAdminPaymentFailedHtml = (order: any, payment: any, customerInfo
     <div class="button-container">
       <a href="${adminUrl}/orders/${order.id}" class="button">View Order in Admin</a>
     </div>
-  `
+  `,
+  storeName
 );
 
-export const getAdminLowStockHtml = (product: any, variant: any, currentStock: number, threshold: number, adminUrl: string) => getBaseTemplate(
-  "Low Stock Alert",
-  `
+export const getAdminLowStockHtml = (product: any, variant: any, currentStock: number, threshold: number, adminUrl: string, storeName?: string) => getBaseTemplate(
+  "Low Stock Alert", `
     <h2 style="color: #f59e0b; margin-top: 0;">Low Stock Alert: ${product.name}</h2>
     <p>An item has reached or fallen below its low stock threshold.</p>
     
@@ -422,12 +406,12 @@ export const getAdminLowStockHtml = (product: any, variant: any, currentStock: n
     <div class="button-container">
       <a href="${adminUrl}/products/${product.id}" class="button">View Product</a>
     </div>
-  `
+  `,
+  storeName
 );
 
-export const getAdminReturnRequestedHtml = (returnReq: any, order: any, customerInfo: any, adminUrl: string) => getBaseTemplate(
-  "New Return Request",
-  `
+export const getAdminReturnRequestedHtml = (returnReq: any, order: any, customerInfo: any, adminUrl: string, storeName?: string) => getBaseTemplate(
+  "New Return Request", `
     <h2 style="color: #18181b; margin-top: 0;">Return Requested: #${order.orderNumber}</h2>
     <p><strong>${customerInfo.name}</strong> (${customerInfo.email}) has requested a return.</p>
     
@@ -441,12 +425,12 @@ export const getAdminReturnRequestedHtml = (returnReq: any, order: any, customer
     <div class="button-container">
       <a href="${adminUrl}/returns/${returnReq.id}" class="button">View Return Request</a>
     </div>
-  `
+  `,
+  storeName
 );
 
-export const getAdminRefundHtml = (refund: any, order: any, type: 'Requested' | 'Completed' | 'Rejected', adminUrl: string) => getBaseTemplate(
-  `Refund ${type}`,
-  `
+export const getAdminRefundHtml = (refund: any, order: any, type: 'Requested' | 'Completed' | 'Rejected', adminUrl: string, storeName?: string) => getBaseTemplate(
+  `Refund ${type}`, `
     <h2 style="color: #18181b; margin-top: 0;">Refund ${type}: #${order.orderNumber}</h2>
     <p>A refund has been <strong>${type.toLowerCase()}</strong> for Order #${order.orderNumber}.</p>
     
@@ -459,12 +443,12 @@ export const getAdminRefundHtml = (refund: any, order: any, type: 'Requested' | 
     <div class="button-container">
       <a href="${adminUrl}/orders/${order.id}" class="button">View Order</a>
     </div>
-  `
+  `,
+  storeName
 );
 
-export const getStaffAssignmentHtml = (staff: any, order: any, adminUrl: string) => getBaseTemplate(
-  "Order Assigned to You",
-  `
+export const getStaffAssignmentHtml = (staff: any, order: any, adminUrl: string, storeName?: string) => getBaseTemplate(
+  "Order Assigned to You", `
     <h2 style="color: #18181b; margin-top: 0;">Hi ${staff.firstName},</h2>
     <p>You have been assigned to process <strong>Order #${order.orderNumber}</strong>.</p>
     
@@ -477,5 +461,6 @@ export const getStaffAssignmentHtml = (staff: any, order: any, adminUrl: string)
     <div class="button-container">
       <a href="${adminUrl}/orders/${order.id}" class="button">View Order</a>
     </div>
-  `
+  `,
+  storeName
 );
