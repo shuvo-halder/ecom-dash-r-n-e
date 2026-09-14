@@ -7,6 +7,8 @@ import { env } from "../config/env";
 import { AppError } from "../utils/AppError";
 import { AuthRequest } from "../middlewares/auth";
 import { AuditService } from "../services/audit.service";
+import { emailService } from "../services/email.service";
+import { logger } from "../config/logger";
 
 export const login = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -270,10 +272,18 @@ export const forgotPassword = async (req: Request, res: Response, next: NextFunc
 
     await AuditService.logSecurityAlert(user.id, "PASSWORD_RESET_REQUESTED", { email: user.email }, req);
 
+    try {
+      await emailService.sendAdminPasswordResetEmail(user.email, user.firstName, resetToken);
+    } catch (emailError: any) {
+      logger.error("[AUTH] Failed to send admin password reset email", {
+        code: emailError?.code,
+        message: emailError?.message,
+      });
+    }
+
     res.status(200).json({
       status: "success",
       message: "If your email is registered, you will receive a reset link.",
-      resetToken, // Returned for testability/API client handling
     });
   } catch (error) {
     next(error);
@@ -312,6 +322,12 @@ export const resetPassword = async (req: Request, res: Response, next: NextFunct
         failedLoginAttempts: 0,
         lockedUntil: null,
       },
+    });
+
+    // Invalidate/revoke all active refresh tokens for this user upon password reset
+    await prisma.refreshToken.updateMany({
+      where: { userId: user.id, revokedAt: null },
+      data: { revokedAt: new Date() },
     });
 
     await AuditService.logPasswordReset(null, user.id, user.email, req);

@@ -113,7 +113,7 @@ export class SettingService {
 
   static async getSMTP() {
     let setting = await prisma.sMTPSetting.findFirst();
-    if (!setting) setting = await prisma.sMTPSetting.create({ data: {} });
+    if (!setting) setting = await prisma.sMTPSetting.create({ data: { port: 587, secure: false } });
     const result = { ...setting };
     if (result.password) {
       result.password = "********";
@@ -125,19 +125,34 @@ export class SettingService {
     if (data.password === "********") {
       delete data.password;
     }
+
+    // Default secure mode based on standard port expectations if not explicitly provided
+    if (data.port === 587 && data.secure === undefined) {
+      data.secure = false;
+    } else if (data.port === 465 && data.secure === undefined) {
+      data.secure = true;
+    }
+
     let setting = await prisma.sMTPSetting.findFirst();
     if (setting) {
       setting = await prisma.sMTPSetting.update({ where: { id: setting.id }, data });
     } else {
       setting = await prisma.sMTPSetting.create({ data });
     }
+
+    // Redact password and sensitive credentials before logging into ActivityLog
+    const auditDetails = { ...data };
+    if (auditDetails.password) {
+      auditDetails.password = "[REDACTED]";
+    }
+
     await prisma.activityLog.create({
       data: {
         userId,
         action: "UPDATE_SMTP",
         entityType: "Settings",
         entityId: setting.id,
-        details: JSON.stringify(data)
+        details: JSON.stringify(auditDetails)
       }
     });
     return setting;
