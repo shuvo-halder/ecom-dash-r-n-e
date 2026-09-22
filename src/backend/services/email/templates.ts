@@ -161,40 +161,44 @@ export const getOrderDetailsHtml = (order) => `
     <p class="muted" style="margin-top: 32px;">If you have any questions, please reply to this email or contact our support team.</p>
 `;
 
-export const getOrderConfirmationHtml = (displayName, order) => getBaseTemplate(
+export const getOrderConfirmationHtml = (displayName: string, order: any, storeName?: string) => getBaseTemplate(
   "Order Confirmation", `
     <h2>Hi ${displayName},</h2>
     <p>Thank you for your order! We've received it and are getting it ready for you.</p>
     ${getOrderDetailsHtml(order)}
-  `
+  `,
+  storeName
 );
 
-export const getOrderProcessingHtml = (displayName, order) => getBaseTemplate(
+export const getOrderProcessingHtml = (displayName: string, order: any, storeName?: string) => getBaseTemplate(
   "Your Order is Processing", `
     <h2>Hi ${displayName},</h2>
     <p>Good news! We are currently processing your order.</p>
     ${getOrderDetailsHtml(order)}
-  `
+  `,
+  storeName
 );
 
-export const getOrderConfirmedHtml = (displayName, order) => getBaseTemplate(
+export const getOrderConfirmedHtml = (displayName: string, order: any, storeName?: string) => getBaseTemplate(
   "Your Order is Confirmed", `
     <h2>Hi ${displayName},</h2>
     <p>Your order has been confirmed and will be shipped soon.</p>
     ${getOrderDetailsHtml(order)}
-  `
+  `,
+  storeName
 );
 
-export const getOrderCancelledHtml = (displayName, order) => getBaseTemplate(
+export const getOrderCancelledHtml = (displayName: string, order: any, storeName?: string) => getBaseTemplate(
   "Order Cancelled", `
     <h2>Hi ${displayName},</h2>
     <p>Your order has been cancelled. If you have already paid, a refund will be processed according to our policy.</p>
     ${getOrderDetailsHtml(order)}
-  `
+  `,
+  storeName
 );
 
 
-export const getPaymentSuccessHtml = (displayName, payment, order) => getBaseTemplate(
+export const getPaymentSuccessHtml = (displayName: string, payment: any, order: any, storeName?: string) => getBaseTemplate(
   "Payment Successful", `
     <h2>Hi ${displayName},</h2>
     <p>Your payment for Order #${order.orderNumber} was successful.</p>
@@ -207,10 +211,11 @@ export const getPaymentSuccessHtml = (displayName, payment, order) => getBaseTem
       <p style="margin-bottom: 0;"><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
     </div>
     <p style="margin-top: 24px;">Thank you for your purchase!</p>
-  `
+  `,
+  storeName
 );
 
-export const getPaymentFailedHtml = (displayName, payment, order) => getBaseTemplate(
+export const getPaymentFailedHtml = (displayName: string, payment: any, order: any, storeName?: string) => getBaseTemplate(
   "Payment Failed", `
     <h2>Hi ${displayName},</h2>
     <p>Unfortunately, your payment attempt for Order #${order.orderNumber} failed.</p>
@@ -221,10 +226,11 @@ export const getPaymentFailedHtml = (displayName, payment, order) => getBaseTemp
       <p style="margin-bottom: 0; color: #991b1b;"><strong>Payment Method:</strong> ${payment.provider}</p>
     </div>
     <p style="margin-top: 24px;">Please try again or use a different payment method. If you continue to experience issues, please contact our support team.</p>
-  `
+  `,
+  storeName
 );
 
-export const getOrderShippedHtml = (displayName, shipment, order) => getBaseTemplate(
+export const getOrderShippedHtml = (displayName: string, shipment: any, order: any, storeName?: string) => getBaseTemplate(
   "Your Order has Shipped", `
     <h2>Hi ${displayName},</h2>
     <p>Great news! Your Order #${order.orderNumber} has been shipped.</p>
@@ -238,10 +244,11 @@ export const getOrderShippedHtml = (displayName, shipment, order) => getBaseTemp
       <h4 style="margin: 0 0 8px 0; color: #3f3f46;">Shipping Address</h4>
       <p style="margin: 0; color: #71717a; white-space: pre-wrap;">${order.shippingAddress || 'N/A'}</p>
     </div>
-  `
+  `,
+  storeName
 );
 
-export const getOrderDeliveredHtml = (displayName, shipment, order) => getBaseTemplate(
+export const getOrderDeliveredHtml = (displayName: string, shipment: any, order: any, storeName?: string) => getBaseTemplate(
   "Your Order has been Delivered", `
     <h2>Hi ${displayName},</h2>
     <p>Your Order #${order.orderNumber} has been successfully delivered.</p>
@@ -252,11 +259,12 @@ export const getOrderDeliveredHtml = (displayName, shipment, order) => getBaseTe
       <p style="margin-bottom: 0;"><strong>Delivered On:</strong> ${new Date().toLocaleDateString()}</p>
     </div>
     <p style="margin-top: 24px;">We hope you enjoy your purchase! If there are any issues with your order, please contact our support team.</p>
-  `
+  `,
+  storeName
 );
 
 
-export const getReturnRequestedHtml = (displayName, returnReq, order) => getBaseTemplate(
+export const getReturnRequestedHtml = (displayName: string, returnReq: any, order: any, storeName?: string) => getBaseTemplate(
   "Return Requested", `
     <h2>Hi ${displayName},</h2>
     <p>We have received your return request for Order #${order.orderNumber}.</p>
@@ -267,10 +275,11 @@ export const getReturnRequestedHtml = (displayName, returnReq, order) => getBase
       <p style="margin-bottom: 0;"><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
     </div>
     <p style="margin-top: 24px;">Our team will review your request and get back to you shortly.</p>
-  `
+  `,
+  storeName
 );
 
-export const getReturnApprovedHtml = (displayName, returnReq, order) => getBaseTemplate(
+export const getReturnApprovedHtml = (displayName: string, returnReq: any, order: any, storeName?: string) => getBaseTemplate(
   "Return Approved", `
     <h2>Hi ${displayName},</h2>
     <p>Your return request for Order #${order.orderNumber} has been approved.</p>
@@ -280,10 +289,11 @@ export const getReturnApprovedHtml = (displayName, returnReq, order) => getBaseT
       <p style="margin-bottom: 0;"><strong>Status:</strong> Approved</p>
     </div>
     <p style="margin-top: 24px;">Please follow the instructions provided by our support team to send the item(s) back.</p>
-  `
+  `,
+  storeName
 );
 
-export const getReturnRejectedHtml = (displayName, returnReq, order) => getBaseTemplate(
+export const getReturnRejectedHtml = (displayName: string, returnReq: any, order: any, storeName?: string) => getBaseTemplate(
   "Return Rejected", `
     <h2>Hi ${displayName},</h2>
     <p>We have reviewed your return request for Order #${order.orderNumber}, but unfortunately it has been rejected.</p>
@@ -294,10 +304,11 @@ export const getReturnRejectedHtml = (displayName, returnReq, order) => getBaseT
     </div>
     ${returnReq.adminNotes ? `<p style="margin-top: 16px;"><strong>Reason:</strong> ${returnReq.adminNotes}</p>` : ''}
     <p style="margin-top: 24px;">If you have any questions, please contact our support team.</p>
-  `
+  `,
+  storeName
 );
 
-export const getReturnReceivedHtml = (displayName, returnReq, order) => getBaseTemplate(
+export const getReturnReceivedHtml = (displayName: string, returnReq: any, order: any, storeName?: string) => getBaseTemplate(
   "Return Received", `
     <h2>Hi ${displayName},</h2>
     <p>We have successfully received the returned item(s) for Order #${order.orderNumber}.</p>
@@ -307,10 +318,11 @@ export const getReturnReceivedHtml = (displayName, returnReq, order) => getBaseT
       <p style="margin-bottom: 0;"><strong>Status:</strong> Received</p>
     </div>
     <p style="margin-top: 24px;">We will process your refund or replacement as per our policy shortly.</p>
-  `
+  `,
+  storeName
 );
 
-export const getRefundRequestedHtml = (displayName, refund, order) => getBaseTemplate(
+export const getRefundRequestedHtml = (displayName: string, refund: any, order: any, storeName?: string) => getBaseTemplate(
   "Refund Requested", `
     <h2>Hi ${displayName},</h2>
     <p>We have received your refund request for Order #${order.orderNumber}.</p>
@@ -321,10 +333,11 @@ export const getRefundRequestedHtml = (displayName, refund, order) => getBaseTem
       <p style="margin-bottom: 0;"><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
     </div>
     <p style="margin-top: 24px;">Our team will review your request and process it shortly.</p>
-  `
+  `,
+  storeName
 );
 
-export const getRefundCompletedHtml = (displayName, refund, order) => getBaseTemplate(
+export const getRefundCompletedHtml = (displayName: string, refund: any, order: any, storeName?: string) => getBaseTemplate(
   "Refund Completed", `
     <h2>Hi ${displayName},</h2>
     <p>Your refund for Order #${order.orderNumber} has been successfully processed.</p>
@@ -334,10 +347,11 @@ export const getRefundCompletedHtml = (displayName, refund, order) => getBaseTem
       <p style="margin-bottom: 0;"><strong>Status:</strong> Completed</p>
     </div>
     <p style="margin-top: 24px;">Please allow a few business days for the amount to reflect in your original payment method.</p>
-  `
+  `,
+  storeName
 );
 
-export const getRefundRejectedHtml = (displayName, refund, order) => getBaseTemplate(
+export const getRefundRejectedHtml = (displayName: string, refund: any, order: any, storeName?: string) => getBaseTemplate(
   "Refund Rejected", `
     <h2>Hi ${displayName},</h2>
     <p>We have reviewed your refund request for Order #${order.orderNumber}, but unfortunately it has been rejected.</p>
@@ -347,7 +361,8 @@ export const getRefundRejectedHtml = (displayName, refund, order) => getBaseTemp
       <p style="margin-bottom: 0; color: #991b1b;"><strong>Status:</strong> Rejected</p>
     </div>
     <p style="margin-top: 24px;">If you have any questions, please contact our support team.</p>
-  `
+  `,
+  storeName
 );
 
 export const getAdminOrderNotificationHtml = (order: any, customerInfo: any, adminUrl: string, storeName?: string) => getBaseTemplate(

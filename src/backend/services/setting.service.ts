@@ -155,7 +155,12 @@ export class SettingService {
         details: JSON.stringify(auditDetails)
       }
     });
-    return setting;
+
+    const result = { ...setting };
+    if (result.password) {
+      result.password = "********";
+    }
+    return result;
   }
 
   static async getAnalytics() {

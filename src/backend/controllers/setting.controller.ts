@@ -4,6 +4,7 @@ import { SettingService as InternalSettingService } from "../services/setting.se
 import { Response, NextFunction } from "express";
 import { SettingService } from "../services/setting.service";
 import { AuthRequest } from "../middlewares/auth";
+import { logger } from "../config/logger";
 
 export const getGeneral = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
@@ -180,7 +181,12 @@ export const testSMTP = async (req: AuthRequest, res: Response, next: NextFuncti
       });
 
     } catch (smtpError: any) {
-      console.log("TEST SMTP ERROR:", smtpError);
+      logger.error("[SETTINGS] SMTP verification test failed", {
+        code: smtpError?.code,
+        command: smtpError?.command,
+        responseCode: smtpError?.responseCode,
+        message: smtpError?.message || "SMTP connection failed"
+      });
       return res.status(400).json({
         status: "error",
         message: "SMTP connection failed. Please verify the SMTP host, port, security mode, username, and password."

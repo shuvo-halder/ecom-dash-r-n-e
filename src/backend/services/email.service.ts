@@ -97,8 +97,8 @@ export class EmailService {
     } catch {
       // Fallback
     }
-    if (setting && setting.storeName) {
-      return setting.storeName;
+    if (setting && (setting.siteName || setting.storeName)) {
+      return setting.siteName || setting.storeName;
     }
     return process.env.STORE_NAME || 'Storefront';
   }
